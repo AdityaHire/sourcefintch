@@ -33,6 +33,16 @@ const findByUserId = async (userId) => {
   return rows;
 };
 
+const findActiveByUserId = async (userId) => {
+  const sql = `
+    SELECT * FROM repositories
+    WHERE user_id = ? AND status IN ('pending', 'cloning', 'scanning')
+    ORDER BY created_at DESC
+  `;
+  const [rows] = await pool.execute(sql, [userId]);
+  return rows;
+};
+
 // ── UPDATE ──────────────────────────────────────────────────────────────────
 
 const update = async (id, fields) => {
@@ -57,4 +67,4 @@ const remove = async (id) => {
   return result.affectedRows > 0;
 };
 
-module.exports = { create, findById, findByUserId, update, remove };
+module.exports = { create, findById, findByUserId, findActiveByUserId, update, remove };

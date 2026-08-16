@@ -27,6 +27,18 @@ const config = {
     database: process.env.MYSQL_DATABASE || 'sourcefinch',
     ssl: process.env.MYSQL_SSL === 'true',
   },
+
+  // ── GitHub ─────────────────────────────────────────
+  github: {
+    token: process.env.GITHUB_TOKEN || '',
+  },
+
+  // ── Ingestion limits ───────────────────────────────
+  ingestion: {
+    maxRepoSizeKb: Number.isNaN(parseInt(process.env.MAX_REPO_SIZE_KB, 10)) ? 50000 : parseInt(process.env.MAX_REPO_SIZE_KB, 10),
+    maxFileSizeBytes: Number.isNaN(parseInt(process.env.MAX_FILE_SIZE_BYTES, 10)) ? 1048576 : parseInt(process.env.MAX_FILE_SIZE_BYTES, 10),
+    cloneTimeoutMs: Number.isNaN(parseInt(process.env.CLONE_TIMEOUT_MS, 10)) ? 120000 : parseInt(process.env.CLONE_TIMEOUT_MS, 10),
+  },
 };
 
 module.exports = config;

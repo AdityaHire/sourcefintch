@@ -8,9 +8,11 @@
 
 const { Router } = require('express');
 const healthRoutes = require('./health.routes');
+const repositoriesRoutes = require('./repository.routes');
 
 const router = Router();
 
 router.use('/health', healthRoutes);
+router.use('/repositories', repositoriesRoutes);
 
 module.exports = router;
