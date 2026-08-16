@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+/*
+ * Global base styles.
+ *
+ * Tailwind v4 uses @import instead of @tailwind directives.
+ * Custom CSS below sets the dark background and smooth defaults.
+ */
+
+/* ── Base reset & defaults ─────────────────────────── */
+html {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-zinc-950 text-white antialiased;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* ── Smooth scrolling ──────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ── Selection color ───────────────────────────────── */
+::selection {
+  @apply bg-indigo-500/30 text-white;
+}
+
+/* ── Scrollbar styling (webkit) ────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply rounded-full bg-zinc-700;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-zinc-600;
+}
