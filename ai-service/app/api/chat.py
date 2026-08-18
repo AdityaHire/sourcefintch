@@ -7,7 +7,7 @@ answers via the configured LLM provider.
 """
 
 import logging
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -22,7 +22,7 @@ class ChatRequest(BaseModel):
     """Request payload for the POST /ai/chat endpoint."""
 
     repository_id: int = Field(..., description="MySQL repository ID", example=1)
-    message: str = Field(..., description="User question or prompt", example="What does this repository do?")
+    message: str = Field(..., min_length=1, description="User question or prompt", example="What does this repository do?")
 
 
 class SourceCitation(BaseModel):
@@ -33,6 +33,7 @@ class SourceCitation(BaseModel):
     end_line: int
     code_chunk_id: Any = None
     score: float
+    content: Optional[str] = None
 
 
 class ChatResponse(BaseModel):

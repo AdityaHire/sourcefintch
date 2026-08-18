@@ -4,6 +4,7 @@
 
 const { Router } = require('express');
 const {
+  listCompletedRepositories,
   createRepository,
   getRepository,
   getRepositoryFiles,
@@ -12,6 +13,9 @@ const {
 } = require('../controllers/repository.controller');
 
 const router = Router();
+
+// GET /api/repositories — list all completed repositories
+router.get('/', listCompletedRepositories);
 
 // POST /api/repositories
 router.post('/', createRepository);

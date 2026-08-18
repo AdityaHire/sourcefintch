@@ -22,12 +22,12 @@ class Settings(BaseSettings):
     llm_provider: str = "groq"
     llm_api_key: str = ""  # General LLM key
     groq_api_key: str = ""  # Groq-specific key
-    llm_model: str = "llama-3.1-8b-instant"
+    llm_model: str = "openai/gpt-oss-20b"
     llm_timeout_seconds: float = 30.0
 
     # ── RAG Parameters ──────────────────────────────
     rag_top_k: int = 5
-    rag_min_score: float = 0.3
+    rag_min_score: float = 0.20
     rag_max_context_chars: int = 12000
 
     # ── Embeddings ──────────────────────────────────

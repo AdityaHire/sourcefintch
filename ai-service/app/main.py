@@ -36,10 +36,30 @@ logging.basicConfig(
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
 )
 
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup and shutdown lifecycle handler."""
+    logger = logging.getLogger(__name__)
+    try:
+        from app.services.vector_service import ensure_collection
+        from app.services.embedding_service import get_vector_dimension
+        ensure_collection(settings.qdrant_collection_name, get_vector_dimension())
+        logger.info("Startup vector dimension check passed for collection '%s'.", settings.qdrant_collection_name)
+    except ValueError as val_err:
+        logger.error("Vector dimension mismatch on startup: %s", val_err)
+        raise
+    except Exception as exc:
+        logger.warning("Qdrant connection or check on startup: %s", exc)
+    yield
+
+
 app = FastAPI(
     title="Sourcefinch AI Service",
     description="AI-powered code analysis — embeddings, parsing, and RAG queries",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # ── CORS ────────────────────────────────────────────
@@ -86,8 +106,14 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     errors = exc.errors()
     messages = []
     for err in errors:
-        field = " → ".join(str(loc) for loc in err.get("loc", []))
-        messages.append(f"{field}: {err.get('msg', 'invalid')}")
+        loc_parts = [
+            str(loc)
+            for loc in err.get("loc", [])
+            if loc not in ("body", "query", "path", "header", "__root__")
+        ]
+        field = ".".join(loc_parts) if loc_parts else "body"
+        msg = err.get("msg", "Invalid value")
+        messages.append(f"{field}: {msg}")
 
     return JSONResponse(
         status_code=422,

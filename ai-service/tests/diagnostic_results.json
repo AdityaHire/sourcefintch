@@ -1,0 +1,358 @@
+[
+  {
+    "repo_id": 20,
+    "repo_name": "Spoon-Knife",
+    "question": "What CSS styles and layout rules are applied to the octocat image?",
+    "intent": "Targeting styles.css #octocat rules",
+    "is_followup": false,
+    "top_scores": [
+      {
+        "rank": 1,
+        "score": 0.49952048,
+        "file_path": "styles.css",
+        "lines": "1-17",
+        "content": "* {\n  margin:0px;\n  padding:0px;\n}\n\n#octocat {\n  display: block;\n  width:384px;\n  margin: 50px auto;\n}\n\np {\n  display: block;\n  width: 400px;\n  margin: 50px auto;\n  font: 30px Monaco,\"Courier New\",\"DejaVu Sans Mono\",\"Bitstream Vera Sans Mono\",monospace;\n}\n"
+      },
+      {
+        "rank": 2,
+        "score": 0.30176252,
+        "file_path": "index.html",
+        "lines": "1-20",
+        "content": "<!DOCTYPE html>\n\n<html>\n<head>\n  <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"/>\n  <title>Spoon-Knife</title>\n  <LINK href=\"styles.css\" rel=\"stylesheet\" type=\"text/css\">\n</head>\n\n<body>\n\n<img src=\"forkit.gif\" id=\"octocat\" alt=\"\" />\n\n<!-- Feel free to change this text here -->\n<p>\n  Fork me? Fork you, @octocat!\n</p>\n\n</body>\n</html>\n"
+      },
+      {
+        "rank": 3,
+        "score": 0.043964326,
+        "file_path": "README.md",
+        "lines": "1-9",
+        "content": "### Well hello there!\n\nThis repository is meant to provide an example for *forking* a repository on GitHub.\n\nCreating a *fork* is producing a personal copy of someone else's project. Forks act as a sort of bridge between the original repository and your personal copy. You can submit *Pull Requests* to help make other people's projects better by offering your changes up to the original project. Forking is at the core of social coding at GitHub.\n\nAfter forking this repository, you can make some changes to the project, and submit [a Pull Request](https://github.com/octocat/Spoon-Knife/pulls) as practice.\n\nFor some more information on how to fork a repository, [check out our guide, \"Forking Projects\"\"](http://guides.github.com/overviews/forking/). Thanks! :sparkling_heart:\n"
+      }
+    ]
+  },
+  {
+    "repo_id": 20,
+    "repo_name": "Spoon-Knife",
+    "question": "What HTML elements are in the page body?",
+    "intent": "Targeting index.html structure",
+    "is_followup": false,
+    "top_scores": [
+      {
+        "rank": 1,
+        "score": 0.3141101,
+        "file_path": "styles.css",
+        "lines": "1-17",
+        "content": "* {\n  margin:0px;\n  padding:0px;\n}\n\n#octocat {\n  display: block;\n  width:384px;\n  margin: 50px auto;\n}\n\np {\n  display: block;\n  width: 400px;\n  margin: 50px auto;\n  font: 30px Monaco,\"Courier New\",\"DejaVu Sans Mono\",\"Bitstream Vera Sans Mono\",monospace;\n}\n"
+      },
+      {
+        "rank": 2,
+        "score": 0.2545601,
+        "file_path": "index.html",
+        "lines": "1-20",
+        "content": "<!DOCTYPE html>\n\n<html>\n<head>\n  <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"/>\n  <title>Spoon-Knife</title>\n  <LINK href=\"styles.css\" rel=\"stylesheet\" type=\"text/css\">\n</head>\n\n<body>\n\n<img src=\"forkit.gif\" id=\"octocat\" alt=\"\" />\n\n<!-- Feel free to change this text here -->\n<p>\n  Fork me? Fork you, @octocat!\n</p>\n\n</body>\n</html>\n"
+      },
+      {
+        "rank": 3,
+        "score": -0.03562911,
+        "file_path": "README.md",
+        "lines": "1-9",
+        "content": "### Well hello there!\n\nThis repository is meant to provide an example for *forking* a repository on GitHub.\n\nCreating a *fork* is producing a personal copy of someone else's project. Forks act as a sort of bridge between the original repository and your personal copy. You can submit *Pull Requests* to help make other people's projects better by offering your changes up to the original project. Forking is at the core of social coding at GitHub.\n\nAfter forking this repository, you can make some changes to the project, and submit [a Pull Request](https://github.com/octocat/Spoon-Knife/pulls) as practice.\n\nFor some more information on how to fork a repository, [check out our guide, \"Forking Projects\"\"](http://guides.github.com/overviews/forking/). Thanks! :sparkling_heart:\n"
+      }
+    ]
+  },
+  {
+    "repo_id": 20,
+    "repo_name": "Spoon-Knife",
+    "question": "How do I make changes and submit a pull request?",
+    "intent": "Targeting README.md PR instructions",
+    "is_followup": false,
+    "top_scores": [
+      {
+        "rank": 1,
+        "score": 0.45585072,
+        "file_path": "README.md",
+        "lines": "1-9",
+        "content": "### Well hello there!\n\nThis repository is meant to provide an example for *forking* a repository on GitHub.\n\nCreating a *fork* is producing a personal copy of someone else's project. Forks act as a sort of bridge between the original repository and your personal copy. You can submit *Pull Requests* to help make other people's projects better by offering your changes up to the original project. Forking is at the core of social coding at GitHub.\n\nAfter forking this repository, you can make some changes to the project, and submit [a Pull Request](https://github.com/octocat/Spoon-Knife/pulls) as practice.\n\nFor some more information on how to fork a repository, [check out our guide, \"Forking Projects\"\"](http://guides.github.com/overviews/forking/). Thanks! :sparkling_heart:\n"
+      },
+      {
+        "rank": 2,
+        "score": 0.15366256,
+        "file_path": "index.html",
+        "lines": "1-20",
+        "content": "<!DOCTYPE html>\n\n<html>\n<head>\n  <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"/>\n  <title>Spoon-Knife</title>\n  <LINK href=\"styles.css\" rel=\"stylesheet\" type=\"text/css\">\n</head>\n\n<body>\n\n<img src=\"forkit.gif\" id=\"octocat\" alt=\"\" />\n\n<!-- Feel free to change this text here -->\n<p>\n  Fork me? Fork you, @octocat!\n</p>\n\n</body>\n</html>\n"
+      },
+      {
+        "rank": 3,
+        "score": -0.029396344,
+        "file_path": "styles.css",
+        "lines": "1-17",
+        "content": "* {\n  margin:0px;\n  padding:0px;\n}\n\n#octocat {\n  display: block;\n  width:384px;\n  margin: 50px auto;\n}\n\np {\n  display: block;\n  width: 400px;\n  margin: 50px auto;\n  font: 30px Monaco,\"Courier New\",\"DejaVu Sans Mono\",\"Bitstream Vera Sans Mono\",monospace;\n}\n"
+      }
+    ]
+  },
+  {
+    "repo_id": 20,
+    "repo_name": "Spoon-Knife",
+    "question": "Can you explain how to contribute to this?",
+    "intent": "Targeting README.md (mild pronoun)",
+    "is_followup": true,
+    "top_scores": [
+      {
+        "rank": 1,
+        "score": 0.3388539,
+        "file_path": "README.md",
+        "lines": "1-9",
+        "content": "### Well hello there!\n\nThis repository is meant to provide an example for *forking* a repository on GitHub.\n\nCreating a *fork* is producing a personal copy of someone else's project. Forks act as a sort of bridge between the original repository and your personal copy. You can submit *Pull Requests* to help make other people's projects better by offering your changes up to the original project. Forking is at the core of social coding at GitHub.\n\nAfter forking this repository, you can make some changes to the project, and submit [a Pull Request](https://github.com/octocat/Spoon-Knife/pulls) as practice.\n\nFor some more information on how to fork a repository, [check out our guide, \"Forking Projects\"\"](http://guides.github.com/overviews/forking/). Thanks! :sparkling_heart:\n"
+      },
+      {
+        "rank": 2,
+        "score": 0.14776996,
+        "file_path": "index.html",
+        "lines": "1-20",
+        "content": "<!DOCTYPE html>\n\n<html>\n<head>\n  <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"/>\n  <title>Spoon-Knife</title>\n  <LINK href=\"styles.css\" rel=\"stylesheet\" type=\"text/css\">\n</head>\n\n<body>\n\n<img src=\"forkit.gif\" id=\"octocat\" alt=\"\" />\n\n<!-- Feel free to change this text here -->\n<p>\n  Fork me? Fork you, @octocat!\n</p>\n\n</body>\n</html>\n"
+      },
+      {
+        "rank": 3,
+        "score": 0.12230503,
+        "file_path": "styles.css",
+        "lines": "1-17",
+        "content": "* {\n  margin:0px;\n  padding:0px;\n}\n\n#octocat {\n  display: block;\n  width:384px;\n  margin: 50px auto;\n}\n\np {\n  display: block;\n  width: 400px;\n  margin: 50px auto;\n  font: 30px Monaco,\"Courier New\",\"DejaVu Sans Mono\",\"Bitstream Vera Sans Mono\",monospace;\n}\n"
+      }
+    ]
+  },
+  {
+    "repo_id": 20,
+    "repo_name": "Spoon-Knife",
+    "question": "What styling is in styles.css?",
+    "intent": "Direct file query",
+    "is_followup": false,
+    "top_scores": [
+      {
+        "rank": 1,
+        "score": 0.32769197,
+        "file_path": "styles.css",
+        "lines": "1-17",
+        "content": "* {\n  margin:0px;\n  padding:0px;\n}\n\n#octocat {\n  display: block;\n  width:384px;\n  margin: 50px auto;\n}\n\np {\n  display: block;\n  width: 400px;\n  margin: 50px auto;\n  font: 30px Monaco,\"Courier New\",\"DejaVu Sans Mono\",\"Bitstream Vera Sans Mono\",monospace;\n}\n"
+      },
+      {
+        "rank": 2,
+        "score": 0.21328053,
+        "file_path": "index.html",
+        "lines": "1-20",
+        "content": "<!DOCTYPE html>\n\n<html>\n<head>\n  <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"/>\n  <title>Spoon-Knife</title>\n  <LINK href=\"styles.css\" rel=\"stylesheet\" type=\"text/css\">\n</head>\n\n<body>\n\n<img src=\"forkit.gif\" id=\"octocat\" alt=\"\" />\n\n<!-- Feel free to change this text here -->\n<p>\n  Fork me? Fork you, @octocat!\n</p>\n\n</body>\n</html>\n"
+      },
+      {
+        "rank": 3,
+        "score": 0.04175259,
+        "file_path": "README.md",
+        "lines": "1-9",
+        "content": "### Well hello there!\n\nThis repository is meant to provide an example for *forking* a repository on GitHub.\n\nCreating a *fork* is producing a personal copy of someone else's project. Forks act as a sort of bridge between the original repository and your personal copy. You can submit *Pull Requests* to help make other people's projects better by offering your changes up to the original project. Forking is at the core of social coding at GitHub.\n\nAfter forking this repository, you can make some changes to the project, and submit [a Pull Request](https://github.com/octocat/Spoon-Knife/pulls) as practice.\n\nFor some more information on how to fork a repository, [check out our guide, \"Forking Projects\"\"](http://guides.github.com/overviews/forking/). Thanks! :sparkling_heart:\n"
+      }
+    ]
+  },
+  {
+    "repo_id": 28,
+    "repo_name": "boysenberry-repo-1",
+    "question": "How do I edit and maintain content on GitHub Pages?",
+    "intent": "Targeting README.md markdown instructions",
+    "is_followup": false,
+    "top_scores": [
+      {
+        "rank": 1,
+        "score": 0.6046025,
+        "file_path": "README.md",
+        "lines": "1-37",
+        "content": "## Welcome to GitHub Pages\n\nYou can use the [editor on GitHub](https://github.com/violet-org/boysenberry-repo/edit/master/README.md) to maintain and preview the content for your website in Markdown files.\n\nWhenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.\n\n### Markdown\n\nMarkdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for\n\n```markdown\nSyntax highlighted code block\n\n# Header 1\n## Header 2\n### Header 3\n\n- Bulleted\n- List\n\n1. Numbered\n2. List\n\n**Bold** and _Italic_ and `Code` text\n\n[Link](url) and ![Image](src)\n```\n\nFor more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).\n\n### Jekyll Themes\n\nYour Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/violet-org/boysenberry-repo/settings). The name of this theme is saved in the Jekyll `_config.yml` configuration file.\n\n### Support or Contact\n\nHaving trouble with Pages? Check out our [documentation](https://help.github.com/categories/github-pages-basics/) or [contact support](https://github.com/contact) and we\u2019ll help you sort it out.\n"
+      },
+      {
+        "rank": 2,
+        "score": 0.17126495,
+        "file_path": "_config.yml",
+        "lines": "1-2",
+        "content": "\ntheme: jekyll-theme-minimal"
+      }
+    ]
+  },
+  {
+    "repo_id": 28,
+    "repo_name": "boysenberry-repo-1",
+    "question": "What markdown formatting features are supported?",
+    "intent": "Targeting README.md code block & formatting",
+    "is_followup": false,
+    "top_scores": [
+      {
+        "rank": 1,
+        "score": 0.5302621,
+        "file_path": "README.md",
+        "lines": "1-37",
+        "content": "## Welcome to GitHub Pages\n\nYou can use the [editor on GitHub](https://github.com/violet-org/boysenberry-repo/edit/master/README.md) to maintain and preview the content for your website in Markdown files.\n\nWhenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.\n\n### Markdown\n\nMarkdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for\n\n```markdown\nSyntax highlighted code block\n\n# Header 1\n## Header 2\n### Header 3\n\n- Bulleted\n- List\n\n1. Numbered\n2. List\n\n**Bold** and _Italic_ and `Code` text\n\n[Link](url) and ![Image](src)\n```\n\nFor more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).\n\n### Jekyll Themes\n\nYour Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/violet-org/boysenberry-repo/settings). The name of this theme is saved in the Jekyll `_config.yml` configuration file.\n\n### Support or Contact\n\nHaving trouble with Pages? Check out our [documentation](https://help.github.com/categories/github-pages-basics/) or [contact support](https://github.com/contact) and we\u2019ll help you sort it out.\n"
+      },
+      {
+        "rank": 2,
+        "score": 0.10952684,
+        "file_path": "_config.yml",
+        "lines": "1-2",
+        "content": "\ntheme: jekyll-theme-minimal"
+      }
+    ]
+  },
+  {
+    "repo_id": 28,
+    "repo_name": "boysenberry-repo-1",
+    "question": "What configuration settings exist in this repository?",
+    "intent": "Targeting _config.yml",
+    "is_followup": false,
+    "top_scores": [
+      {
+        "rank": 1,
+        "score": 0.21364665,
+        "file_path": "README.md",
+        "lines": "1-37",
+        "content": "## Welcome to GitHub Pages\n\nYou can use the [editor on GitHub](https://github.com/violet-org/boysenberry-repo/edit/master/README.md) to maintain and preview the content for your website in Markdown files.\n\nWhenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.\n\n### Markdown\n\nMarkdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for\n\n```markdown\nSyntax highlighted code block\n\n# Header 1\n## Header 2\n### Header 3\n\n- Bulleted\n- List\n\n1. Numbered\n2. List\n\n**Bold** and _Italic_ and `Code` text\n\n[Link](url) and ![Image](src)\n```\n\nFor more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).\n\n### Jekyll Themes\n\nYour Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/violet-org/boysenberry-repo/settings). The name of this theme is saved in the Jekyll `_config.yml` configuration file.\n\n### Support or Contact\n\nHaving trouble with Pages? Check out our [documentation](https://help.github.com/categories/github-pages-basics/) or [contact support](https://github.com/contact) and we\u2019ll help you sort it out.\n"
+      },
+      {
+        "rank": 2,
+        "score": 0.11756646,
+        "file_path": "_config.yml",
+        "lines": "1-2",
+        "content": "\ntheme: jekyll-theme-minimal"
+      }
+    ]
+  },
+  {
+    "repo_id": 28,
+    "repo_name": "boysenberry-repo-1",
+    "question": "Where can I find support or documentation?",
+    "intent": "Targeting README.md support links",
+    "is_followup": false,
+    "top_scores": [
+      {
+        "rank": 1,
+        "score": 0.2768534,
+        "file_path": "README.md",
+        "lines": "1-37",
+        "content": "## Welcome to GitHub Pages\n\nYou can use the [editor on GitHub](https://github.com/violet-org/boysenberry-repo/edit/master/README.md) to maintain and preview the content for your website in Markdown files.\n\nWhenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.\n\n### Markdown\n\nMarkdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for\n\n```markdown\nSyntax highlighted code block\n\n# Header 1\n## Header 2\n### Header 3\n\n- Bulleted\n- List\n\n1. Numbered\n2. List\n\n**Bold** and _Italic_ and `Code` text\n\n[Link](url) and ![Image](src)\n```\n\nFor more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).\n\n### Jekyll Themes\n\nYour Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/violet-org/boysenberry-repo/settings). The name of this theme is saved in the Jekyll `_config.yml` configuration file.\n\n### Support or Contact\n\nHaving trouble with Pages? Check out our [documentation](https://help.github.com/categories/github-pages-basics/) or [contact support](https://github.com/contact) and we\u2019ll help you sort it out.\n"
+      },
+      {
+        "rank": 2,
+        "score": -0.040739443,
+        "file_path": "_config.yml",
+        "lines": "1-2",
+        "content": "\ntheme: jekyll-theme-minimal"
+      }
+    ]
+  },
+  {
+    "repo_id": 2,
+    "repo_name": "Hello-World",
+    "question": "What is the purpose of this project?",
+    "intent": "Targeting Hello-World README",
+    "is_followup": false,
+    "top_scores": []
+  },
+  {
+    "repo_id": 20,
+    "repo_name": "Spoon-Knife",
+    "question": "How do I bake sourdough bread with yeast?",
+    "intent": "Adversarial Noise",
+    "is_followup": false,
+    "top_scores": [
+      {
+        "rank": 1,
+        "score": 0.09617252,
+        "file_path": "index.html",
+        "lines": "1-20",
+        "content": "<!DOCTYPE html>\n\n<html>\n<head>\n  <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"/>\n  <title>Spoon-Knife</title>\n  <LINK href=\"styles.css\" rel=\"stylesheet\" type=\"text/css\">\n</head>\n\n<body>\n\n<img src=\"forkit.gif\" id=\"octocat\" alt=\"\" />\n\n<!-- Feel free to change this text here -->\n<p>\n  Fork me? Fork you, @octocat!\n</p>\n\n</body>\n</html>\n"
+      },
+      {
+        "rank": 2,
+        "score": 0.08740823,
+        "file_path": "styles.css",
+        "lines": "1-17",
+        "content": "* {\n  margin:0px;\n  padding:0px;\n}\n\n#octocat {\n  display: block;\n  width:384px;\n  margin: 50px auto;\n}\n\np {\n  display: block;\n  width: 400px;\n  margin: 50px auto;\n  font: 30px Monaco,\"Courier New\",\"DejaVu Sans Mono\",\"Bitstream Vera Sans Mono\",monospace;\n}\n"
+      },
+      {
+        "rank": 3,
+        "score": 0.058588974,
+        "file_path": "README.md",
+        "lines": "1-9",
+        "content": "### Well hello there!\n\nThis repository is meant to provide an example for *forking* a repository on GitHub.\n\nCreating a *fork* is producing a personal copy of someone else's project. Forks act as a sort of bridge between the original repository and your personal copy. You can submit *Pull Requests* to help make other people's projects better by offering your changes up to the original project. Forking is at the core of social coding at GitHub.\n\nAfter forking this repository, you can make some changes to the project, and submit [a Pull Request](https://github.com/octocat/Spoon-Knife/pulls) as practice.\n\nFor some more information on how to fork a repository, [check out our guide, \"Forking Projects\"\"](http://guides.github.com/overviews/forking/). Thanks! :sparkling_heart:\n"
+      }
+    ]
+  },
+  {
+    "repo_id": 20,
+    "repo_name": "Spoon-Knife",
+    "question": "What is the capital of France and population?",
+    "intent": "Adversarial Noise",
+    "is_followup": false,
+    "top_scores": [
+      {
+        "rank": 1,
+        "score": 0.11731194,
+        "file_path": "styles.css",
+        "lines": "1-17",
+        "content": "* {\n  margin:0px;\n  padding:0px;\n}\n\n#octocat {\n  display: block;\n  width:384px;\n  margin: 50px auto;\n}\n\np {\n  display: block;\n  width: 400px;\n  margin: 50px auto;\n  font: 30px Monaco,\"Courier New\",\"DejaVu Sans Mono\",\"Bitstream Vera Sans Mono\",monospace;\n}\n"
+      },
+      {
+        "rank": 2,
+        "score": 0.10471143,
+        "file_path": "index.html",
+        "lines": "1-20",
+        "content": "<!DOCTYPE html>\n\n<html>\n<head>\n  <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"/>\n  <title>Spoon-Knife</title>\n  <LINK href=\"styles.css\" rel=\"stylesheet\" type=\"text/css\">\n</head>\n\n<body>\n\n<img src=\"forkit.gif\" id=\"octocat\" alt=\"\" />\n\n<!-- Feel free to change this text here -->\n<p>\n  Fork me? Fork you, @octocat!\n</p>\n\n</body>\n</html>\n"
+      },
+      {
+        "rank": 3,
+        "score": -0.012949636,
+        "file_path": "README.md",
+        "lines": "1-9",
+        "content": "### Well hello there!\n\nThis repository is meant to provide an example for *forking* a repository on GitHub.\n\nCreating a *fork* is producing a personal copy of someone else's project. Forks act as a sort of bridge between the original repository and your personal copy. You can submit *Pull Requests* to help make other people's projects better by offering your changes up to the original project. Forking is at the core of social coding at GitHub.\n\nAfter forking this repository, you can make some changes to the project, and submit [a Pull Request](https://github.com/octocat/Spoon-Knife/pulls) as practice.\n\nFor some more information on how to fork a repository, [check out our guide, \"Forking Projects\"\"](http://guides.github.com/overviews/forking/). Thanks! :sparkling_heart:\n"
+      }
+    ]
+  },
+  {
+    "repo_id": 28,
+    "repo_name": "boysenberry-repo-1",
+    "question": "How do I change the oil in a Honda Civic?",
+    "intent": "Adversarial Noise",
+    "is_followup": false,
+    "top_scores": [
+      {
+        "rank": 1,
+        "score": 0.08974435,
+        "file_path": "_config.yml",
+        "lines": "1-2",
+        "content": "\ntheme: jekyll-theme-minimal"
+      },
+      {
+        "rank": 2,
+        "score": 0.07353234,
+        "file_path": "README.md",
+        "lines": "1-37",
+        "content": "## Welcome to GitHub Pages\n\nYou can use the [editor on GitHub](https://github.com/violet-org/boysenberry-repo/edit/master/README.md) to maintain and preview the content for your website in Markdown files.\n\nWhenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.\n\n### Markdown\n\nMarkdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for\n\n```markdown\nSyntax highlighted code block\n\n# Header 1\n## Header 2\n### Header 3\n\n- Bulleted\n- List\n\n1. Numbered\n2. List\n\n**Bold** and _Italic_ and `Code` text\n\n[Link](url) and ![Image](src)\n```\n\nFor more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).\n\n### Jekyll Themes\n\nYour Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/violet-org/boysenberry-repo/settings). The name of this theme is saved in the Jekyll `_config.yml` configuration file.\n\n### Support or Contact\n\nHaving trouble with Pages? Check out our [documentation](https://help.github.com/categories/github-pages-basics/) or [contact support](https://github.com/contact) and we\u2019ll help you sort it out.\n"
+      }
+    ]
+  },
+  {
+    "repo_id": 28,
+    "repo_name": "boysenberry-repo-1",
+    "question": "Explain quantum computing and qubits",
+    "intent": "Adversarial Noise",
+    "is_followup": false,
+    "top_scores": [
+      {
+        "rank": 1,
+        "score": 0.048320916,
+        "file_path": "README.md",
+        "lines": "1-37",
+        "content": "## Welcome to GitHub Pages\n\nYou can use the [editor on GitHub](https://github.com/violet-org/boysenberry-repo/edit/master/README.md) to maintain and preview the content for your website in Markdown files.\n\nWhenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.\n\n### Markdown\n\nMarkdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for\n\n```markdown\nSyntax highlighted code block\n\n# Header 1\n## Header 2\n### Header 3\n\n- Bulleted\n- List\n\n1. Numbered\n2. List\n\n**Bold** and _Italic_ and `Code` text\n\n[Link](url) and ![Image](src)\n```\n\nFor more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).\n\n### Jekyll Themes\n\nYour Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/violet-org/boysenberry-repo/settings). The name of this theme is saved in the Jekyll `_config.yml` configuration file.\n\n### Support or Contact\n\nHaving trouble with Pages? Check out our [documentation](https://help.github.com/categories/github-pages-basics/) or [contact support](https://github.com/contact) and we\u2019ll help you sort it out.\n"
+      },
+      {
+        "rank": 2,
+        "score": 0.007516578,
+        "file_path": "_config.yml",
+        "lines": "1-2",
+        "content": "\ntheme: jekyll-theme-minimal"
+      }
+    ]
+  }
+]

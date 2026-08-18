@@ -5,7 +5,12 @@
  * Each function returns the parsed JSON or throws on failure.
  */
 
-import type { HealthResponse } from '../types';
+import type {
+  HealthResponse,
+  Repository,
+  Conversation,
+  ChatResponse,
+} from '../types';
 
 const AI_SERVICE_URL =
   import.meta.env.VITE_AI_SERVICE_URL || 'http://localhost:8000';
@@ -27,5 +32,108 @@ export async function checkBackendHealth(): Promise<HealthResponse> {
 export async function checkAIServiceHealth(): Promise<HealthResponse> {
   const res = await fetch(`${AI_SERVICE_URL}/health`);
   if (!res.ok) throw new Error(`AI service returned ${res.status}`);
+  return res.json();
+}
+
+/**
+ * Fetch all completed repositories available for querying.
+ */
+export async function fetchCompletedRepositories(): Promise<Repository[]> {
+  const res = await fetch('/api/repositories');
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || `Failed to fetch repositories (${res.status})`);
+  }
+  return res.json();
+}
+
+/**
+ * Create a new conversation thread.
+ */
+export async function createConversation(
+  repositoryId: number,
+  title?: string
+): Promise<Conversation> {
+  const res = await fetch('/api/conversations', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ repository_id: repositoryId, title }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || `Failed to create conversation (${res.status})`);
+  }
+  return res.json();
+}
+
+/**
+ * Fetch a conversation by ID with its full message history.
+ */
+export async function fetchConversation(conversationId: number): Promise<Conversation> {
+  const res = await fetch(`/api/conversations/${conversationId}`);
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || `Failed to fetch conversation (${res.status})`);
+  }
+  return res.json();
+}
+
+/**
+ * Trigger ingestion for a new GitHub repository.
+ */
+export async function createRepository(
+  githubUrl: string,
+  branch?: string
+): Promise<{ id: number; name: string; status: string }> {
+  const res = await fetch('/api/repositories', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ github_url: githubUrl, branch: branch || undefined }),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    const err: any = new Error(data.message || `Failed to add repository (${res.status})`);
+    err.statusCode = res.status;
+    throw err;
+  }
+
+  return res.json();
+}
+
+/**
+ * Fetch a single repository's status by ID.
+ */
+export async function getRepository(id: number): Promise<Repository> {
+  const res = await fetch(`/api/repositories/${id}`);
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || `Failed to fetch repository (${res.status})`);
+  }
+  return res.json();
+}
+
+/**
+ * Send a chat message through Node's orchestrator.
+ */
+export async function sendChatMessage(payload: {
+  conversation_id?: number;
+  repository_id: number;
+  message: string;
+}): Promise<ChatResponse> {
+  const res = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    const err: any = new Error(data.message || `Chat request failed (${res.status})`);
+    err.statusCode = res.status;
+    err.details = data;
+    throw err;
+  }
+
   return res.json();
 }

@@ -33,6 +33,17 @@ const findByUserId = async (userId) => {
   return rows;
 };
 
+const findCompleted = async () => {
+  const sql = `
+    SELECT id, name, owner, github_url, branch, file_count, status, created_at
+    FROM repositories
+    WHERE status = 'completed'
+    ORDER BY created_at DESC
+  `;
+  const [rows] = await pool.execute(sql);
+  return rows;
+};
+
 const findActiveByUserId = async (userId) => {
   const sql = `
     SELECT * FROM repositories
@@ -67,4 +78,4 @@ const remove = async (id) => {
   return result.affectedRows > 0;
 };
 
-module.exports = { create, findById, findByUserId, findActiveByUserId, update, remove };
+module.exports = { create, findById, findByUserId, findCompleted, findActiveByUserId, update, remove };

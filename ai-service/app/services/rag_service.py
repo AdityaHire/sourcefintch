@@ -141,6 +141,13 @@ async def answer_question(repository_id: int, question: str) -> dict:
         )
 
     # ── Step 2: Retrieve relevant chunks from Qdrant ─────────────────
+    # NOTE ON MULTI-TURN CONTEXT LIMITATION:
+    # Each question is currently embedded and retrieved independently of prior
+    # conversation turns. Follow-up questions that rely on pronouns or context
+    # from earlier in the conversation (e.g. "how do I run it?") may retrieve poorly
+    # or trigger the zero-evidence fallback, since "it" has no resolvable meaning
+    # at embedding time. Multi-turn context injection is tracked as future work,
+    # not handled in Phase 7.
     candidate_chunks = retrieve_relevant_chunks(
         repository_id=repository_id,
         query=question,
@@ -192,6 +199,7 @@ async def answer_question(repository_id: int, question: str) -> dict:
             "end_line": c["end_line"],
             "code_chunk_id": c.get("code_chunk_id"),
             "score": round(float(c.get("score", 0.0)), 4),
+            "content": c.get("content", ""),
         }
         for c in retained_chunks
     ]

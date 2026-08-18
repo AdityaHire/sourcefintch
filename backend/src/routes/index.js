@@ -10,11 +10,15 @@ const { Router } = require('express');
 const healthRoutes = require('./health.routes');
 const repositoriesRoutes = require('./repository.routes');
 const chunkRoutes = require('./chunk.routes');
+const conversationRoutes = require('./conversation.routes');
+const chatRoutes = require('./chat.routes');
 
 const router = Router();
 
 router.use('/health', healthRoutes);
 router.use('/repositories', repositoriesRoutes);
 router.use('/chunks', chunkRoutes);
+router.use('/conversations', conversationRoutes);
+router.use('/chat', chatRoutes);
 
 module.exports = router;

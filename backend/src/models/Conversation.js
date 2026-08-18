@@ -32,6 +32,12 @@ const findByUserId = async (userId) => {
   return rows;
 };
 
+const findByRepositoryId = async (repositoryId) => {
+  const sql = 'SELECT * FROM conversations WHERE repository_id = ? ORDER BY updated_at DESC';
+  const [rows] = await pool.execute(sql, [repositoryId]);
+  return rows;
+};
+
 // ── UPDATE ──────────────────────────────────────────────────────────────────
 
 const update = async (id, fields) => {
@@ -56,4 +62,4 @@ const remove = async (id) => {
   return result.affectedRows > 0;
 };
 
-module.exports = { create, findById, findByUserId, update, remove };
+module.exports = { create, findById, findByUserId, findByRepositoryId, update, remove };

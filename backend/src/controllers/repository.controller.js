@@ -168,7 +168,21 @@ const deleteRepositoryChunks = async (req, res, next) => {
   }
 };
 
+/**
+ * List all completed repositories.
+ * Used by the frontend repository selector.
+ */
+const listCompletedRepositories = async (req, res, next) => {
+  try {
+    const repos = await Repository.findCompleted();
+    res.json(repos);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
+  listCompletedRepositories,
   createRepository,
   getRepository,
   getRepositoryFiles,

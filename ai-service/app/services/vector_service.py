@@ -46,13 +46,19 @@ def get_qdrant_client() -> QdrantClient:
     return _client_instance
 
 
-def ensure_collection(collection_name: str, vector_size: int) -> None:
-    """Create the Qdrant collection if it does not already exist.
+def ensure_collection(collection_name: str, vector_size: Optional[int] = None) -> None:
+    """Create the Qdrant collection if it does not already exist, or verify dimension match.
 
     Args:
         collection_name: Name of the collection (e.g., 'sourcefinch_chunks').
         vector_size: Dimensionality of vectors (e.g., 384 for all-MiniLM-L6-v2).
+                     If None, it is dynamically retrieved from embedding_service.
     """
+    if vector_size is None:
+        from app.services.embedding_service import get_vector_dimension
+
+        vector_size = get_vector_dimension()
+
     client = get_qdrant_client()
     exists = client.collection_exists(collection_name)
     if not exists:
@@ -69,6 +75,30 @@ def ensure_collection(collection_name: str, vector_size: int) -> None:
             ),
         )
         logger.info("Collection '%s' created successfully.", collection_name)
+    else:
+        # Collection already exists: verify vector dimension match
+        collection_info = client.get_collection(collection_name=collection_name)
+        existing_size = None
+        vectors_config = collection_info.config.params.vectors
+
+        if hasattr(vectors_config, "size"):
+            existing_size = vectors_config.size
+        elif isinstance(vectors_config, dict):
+            first_val = next(iter(vectors_config.values()), None)
+            if hasattr(first_val, "size"):
+                existing_size = first_val.size
+            elif isinstance(first_val, dict):
+                existing_size = first_val.get("size")
+
+        if existing_size is not None and existing_size != vector_size:
+            error_msg = (
+                f"Vector dimension mismatch for Qdrant collection '{collection_name}': "
+                f"existing collection is configured for {existing_size} dimensions, "
+                f"but current embedding model produces {vector_size} dimensions. "
+                f"To resolve, delete the existing collection or revert EMBEDDING_MODEL / EMBEDDING_PROVIDER."
+            )
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
 
 def delete_by_repository_id(collection_name: str, repository_id: int) -> None:

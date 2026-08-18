@@ -39,6 +39,10 @@ cp ai-service/.env.example ai-service/.env
 cp frontend/.env.example frontend/.env
 ```
 
+> **📝 Note on `MAX_REPO_SIZE_KB`**: `MAX_REPO_SIZE_KB` is validated against GitHub's reported repo `size` (which includes full git history), rather than the shallow `--depth 1` clone size downloaded during ingestion.
+> 
+> **📝 Note on Multi-Turn Chat Context**: In Phase 7, each question is embedded and retrieved independently of prior conversation turns. Pronoun-dependent follow-up queries (e.g., *"how do I run it?"*) should mention specific repository/file names for optimal semantic vector retrieval. Multi-turn context injection and query rewriting are tracked for future phases.
+
 ### 2. Set up MySQL
 
 #### 2a. Create the database

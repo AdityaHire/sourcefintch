@@ -58,6 +58,14 @@ const getRepoInfo = async (owner, repo) => {
 /**
  * Validate that a repo is public and within size limits.
  * Throws with a user-facing message if validation fails.
+ *
+ * NOTE ON MAX_REPO_SIZE_KB APPROXIMATION:
+ * GitHub's reported repository `size` field reflects the full git history
+ * size, not the shallow `--depth 1` clone Sourcefinch actually downloads.
+ * As a result, a repository with large historical commits or large deleted
+ * files in its past history could be rejected by this check even though the
+ * shallow clone would be small. This is an acceptable fast approximation to
+ * safeguard resources before cloning.
  */
 const validateRepo = async (owner, repo) => {
   const info = await getRepoInfo(owner, repo);
