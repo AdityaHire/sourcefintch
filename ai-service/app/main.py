@@ -6,13 +6,35 @@ includes all routers.  FastAPI has some nice extras built in:
   - Auto-generated API docs at /docs (Swagger UI) and /redoc
   - Request/response validation from Python type hints
   - Async support by default
+
+GLOBAL ERROR HANDLERS
+=====================
+Every error response matches Node's exact shape:
+    { "status": "error", "statusCode": <num>, "message": "<text>" }
+
+Three handlers cover all cases:
+  - HTTPException       → uses exc.status_code (e.g. 502, 504)
+  - RequestValidationError → 422 with human-readable field errors
+  - Exception (catch-all) → 500 internal server error
 """
 
-from fastapi import FastAPI
+import logging
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.api.health import router as health_router
+from app.api.indexing import router as indexing_router
+from app.api.chat import router as chat_router
+
+# Configure logging for the whole app
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+)
 
 app = FastAPI(
     title="Sourcefinch AI Service",
@@ -30,5 +52,75 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# ── Global exception handlers ──────────────────────
+# These ensure EVERY error response matches Node's shape:
+# { "status": "error", "statusCode": <num>, "message": "<text>" }
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Handle HTTPException (raised explicitly in our code).
+
+    Uses exc.status_code for both the HTTP response code and the
+    statusCode field in the JSON body.  The 'detail' field from
+    HTTPException becomes 'message'.
+    """
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "status": "error",
+            "statusCode": exc.status_code,
+            "message": str(exc.detail),
+        },
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Handle Pydantic validation errors (422).
+
+    Builds a human-readable message from the validation errors so the
+    caller doesn't need to parse FastAPI's default error array.
+    """
+    errors = exc.errors()
+    messages = []
+    for err in errors:
+        field = " → ".join(str(loc) for loc in err.get("loc", []))
+        messages.append(f"{field}: {err.get('msg', 'invalid')}")
+
+    return JSONResponse(
+        status_code=422,
+        content={
+            "status": "error",
+            "statusCode": 422,
+            "message": "; ".join(messages),
+        },
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Catch-all for unexpected errors (500).
+
+    Logs the full traceback server-side but returns a generic message
+    to the caller — never leak internal details.
+    """
+    logger = logging.getLogger(__name__)
+    logger.exception("Unhandled exception on %s %s", request.method, request.url)
+
+    return JSONResponse(
+        status_code=500,
+        content={
+            "status": "error",
+            "statusCode": 500,
+            "message": "Internal server error",
+        },
+    )
+
+
 # ── Routers ─────────────────────────────────────────
 app.include_router(health_router)
+app.include_router(indexing_router)
+app.include_router(chat_router)
+

@@ -36,7 +36,7 @@ const findByUserId = async (userId) => {
 const findActiveByUserId = async (userId) => {
   const sql = `
     SELECT * FROM repositories
-    WHERE user_id = ? AND status IN ('pending', 'cloning', 'scanning')
+    WHERE user_id = ? AND status IN ('pending', 'cloning', 'scanning', 'storing', 'embedding')
     ORDER BY created_at DESC
   `;
   const [rows] = await pool.execute(sql, [userId]);

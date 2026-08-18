@@ -49,7 +49,7 @@ const LANGUAGE_MAP = {
   '.js': 'javascript',
   '.jsx': 'javascript',
   '.ts': 'typescript',
-  '.tsx': 'typescript',
+  '.tsx': 'tsx',
   '.py': 'python',
   '.rb': 'ruby',
   '.go': 'go',
@@ -211,9 +211,30 @@ const ingestRepository = async (repositoryId, githubUrl, branch) => {
 
     await updateStatus(repositoryId, 'storing', { file_count: fileCount });
 
-    // Simulate storing completion (in a real pipeline this would trigger
-    // parsing + embedding, but those are later phases).
-    await updateStatus(repositoryId, 'completed');
+    // ── Trigger AI service parsing (fire-and-forget) ──────────────────
+    // Node's job is done — kick off the Python AI service to parse and
+    // chunk the code.  We don't await the result; Python processes in the
+    // background.  The AbortController timeout (10s) only bounds how long
+    // we wait to *establish* the connection, not Python's processing time.
+    const triggerController = new AbortController();
+    const triggerTimeout = setTimeout(() => triggerController.abort(), 120_000);
+
+    fetch(`${config.aiServiceUrl}/ai/parse`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ repository_id: repositoryId, github_url: githubUrl, branch }),
+      signal: triggerController.signal,
+    })
+      .then(() => {
+        console.log(`[ingestion] AI parse triggered for repository ${repositoryId}`);
+      })
+      .catch((triggerErr) => {
+        // Defensive: log but never crash — ingestion is already complete.
+        console.error(`[ingestion] Failed to trigger AI parse for repository ${repositoryId}:`, triggerErr.message);
+      })
+      .finally(() => {
+        clearTimeout(triggerTimeout);
+      });
   } catch (error) {
     await updateStatus(repositoryId, 'failed');
     throw error;

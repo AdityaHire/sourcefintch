@@ -39,6 +39,9 @@ const config = {
     maxFileSizeBytes: Number.isNaN(parseInt(process.env.MAX_FILE_SIZE_BYTES, 10)) ? 1048576 : parseInt(process.env.MAX_FILE_SIZE_BYTES, 10),
     cloneTimeoutMs: Number.isNaN(parseInt(process.env.CLONE_TIMEOUT_MS, 10)) ? 120000 : parseInt(process.env.CLONE_TIMEOUT_MS, 10),
   },
+
+  // ── AI Service ────────────────────────────────────
+  aiServiceUrl: process.env.AI_SERVICE_URL || 'http://localhost:8000',
 };
 
 module.exports = config;

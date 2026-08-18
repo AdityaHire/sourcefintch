@@ -8,8 +8,9 @@
 -- ── 1. users ────────────────────────────────────────────────────────────────
 -- Stores registered developer accounts.
 -- password_hash: we NEVER store plain-text passwords — only bcrypt hashes.
+-- This table may already exist in a shared database — IF NOT EXISTS skips it.
 CREATE TABLE IF NOT EXISTS users (
-  id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  id             INT AUTO_INCREMENT PRIMARY KEY,
   name           VARCHAR(255)  NOT NULL,
   email          VARCHAR(255)  NOT NULL UNIQUE,
   password_hash  VARCHAR(255)  NOT NULL,
@@ -20,17 +21,17 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- ── 2. repositories ────────────────────────────────────────────────────────
 -- A GitHub repo connected by a user for analysis.
--- status tracks the ingestion pipeline: pending → cloning → parsing → ready / error
+-- status tracks the ingestion pipeline: pending → cloning → scanning → storing → completed / failed
 -- ON DELETE CASCADE: if a user is deleted, all their repos go too.
 CREATE TABLE IF NOT EXISTS repositories (
-  id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  user_id        INT UNSIGNED  NOT NULL,
+  id             INT AUTO_INCREMENT PRIMARY KEY,
+  user_id        INT           NOT NULL,
   name           VARCHAR(255)  NOT NULL,
   owner          VARCHAR(255)  NOT NULL,
   github_url     VARCHAR(2048) NOT NULL,
   branch         VARCHAR(255)  NOT NULL DEFAULT 'main',
-  status         ENUM('pending','cloning','parsing','ready','error') NOT NULL DEFAULT 'pending',
-  file_count     INT UNSIGNED  NOT NULL DEFAULT 0,
+  status         ENUM('pending','cloning','scanning','storing','completed','failed') NOT NULL DEFAULT 'pending',
+  file_count     INT           NOT NULL DEFAULT 0,
   created_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
@@ -42,11 +43,11 @@ CREATE TABLE IF NOT EXISTS repositories (
 -- Individual source files within a repository.
 -- ON DELETE CASCADE: deleting a repo removes all its files.
 CREATE TABLE IF NOT EXISTS files (
-  id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  repository_id   INT UNSIGNED  NOT NULL,
+  id              INT AUTO_INCREMENT PRIMARY KEY,
+  repository_id   INT           NOT NULL,
   file_path       VARCHAR(1024) NOT NULL,
   language        VARCHAR(50)   DEFAULT NULL,
-  file_size       INT UNSIGNED  NOT NULL DEFAULT 0,
+  file_size       INT           NOT NULL DEFAULT 0,
   created_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   FOREIGN KEY (repository_id) REFERENCES repositories(id) ON DELETE CASCADE
@@ -66,11 +67,11 @@ CREATE TABLE IF NOT EXISTS files (
 --
 -- ON DELETE CASCADE: deleting a file removes all its chunks.
 CREATE TABLE IF NOT EXISTS code_chunks (
-  id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  file_id          INT UNSIGNED  NOT NULL,
+  id               INT AUTO_INCREMENT PRIMARY KEY,
+  file_id          INT           NOT NULL,
   qdrant_point_id  VARCHAR(36)   DEFAULT NULL,
-  start_line       INT UNSIGNED  NOT NULL,
-  end_line         INT UNSIGNED  NOT NULL,
+  start_line       INT           NOT NULL,
+  end_line         INT           NOT NULL,
   language         VARCHAR(50)   DEFAULT NULL,
   created_at       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -84,9 +85,9 @@ CREATE TABLE IF NOT EXISTS code_chunks (
 -- ON DELETE SET NULL (repository_id): if a repo is deleted, keep the conversation
 --   history (it's still useful) but clear the repo reference.
 CREATE TABLE IF NOT EXISTS conversations (
-  id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  user_id         INT UNSIGNED  NOT NULL,
-  repository_id   INT UNSIGNED  DEFAULT NULL,
+  id              INT AUTO_INCREMENT PRIMARY KEY,
+  user_id         INT           NOT NULL,
+  repository_id   INT           DEFAULT NULL,
   title           VARCHAR(500)  NOT NULL DEFAULT 'New Conversation',
   created_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -101,11 +102,12 @@ CREATE TABLE IF NOT EXISTS conversations (
 -- role: 'user' (the developer asking) or 'assistant' (the AI answering).
 -- ON DELETE CASCADE: deleting a conversation removes all its messages.
 CREATE TABLE IF NOT EXISTS messages (
-  id                INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  conversation_id   INT UNSIGNED  NOT NULL,
+  id                INT AUTO_INCREMENT PRIMARY KEY,
+  conversation_id   INT           NOT NULL,
   role              ENUM('user','assistant') NOT NULL,
   content           TEXT          NOT NULL,
   created_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

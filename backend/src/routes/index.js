@@ -9,10 +9,12 @@
 const { Router } = require('express');
 const healthRoutes = require('./health.routes');
 const repositoriesRoutes = require('./repository.routes');
+const chunkRoutes = require('./chunk.routes');
 
 const router = Router();
 
 router.use('/health', healthRoutes);
 router.use('/repositories', repositoriesRoutes);
+router.use('/chunks', chunkRoutes);
 
 module.exports = router;

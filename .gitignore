@@ -37,3 +37,8 @@ npm-debug.log*
 # Coverage
 coverage/
 .nyc_output/
+
+# Qdrant local storage and bin
+qdrant_bin/
+storage/
+snapshots/

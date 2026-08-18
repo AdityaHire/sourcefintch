@@ -12,34 +12,68 @@ const { pool } = require('../config/database');
 
 // ── CREATE ──────────────────────────────────────────────────────────────────
 
-const create = async ({ fileId, qdrantPointId = null, startLine, endLine, language = null }) => {
+const create = async ({
+  fileId,
+  file_id,
+  qdrantPointId = null,
+  qdrant_point_id = null,
+  startLine,
+  start_line,
+  endLine,
+  end_line,
+  language = null,
+}) => {
+  const fId = fileId || file_id;
+  const qPointId = qdrantPointId || qdrant_point_id || null;
+  const sLine = startLine !== undefined ? startLine : start_line;
+  const eLine = endLine !== undefined ? endLine : end_line;
+
   const sql = `
     INSERT INTO code_chunks (file_id, qdrant_point_id, start_line, end_line, language)
     VALUES (?, ?, ?, ?, ?)
   `;
-  const [result] = await pool.execute(sql, [fileId, qdrantPointId, startLine, endLine, language]);
+  const [result] = await pool.execute(sql, [fId, qPointId, sLine, eLine, language]);
   return findById(result.insertId);
 };
 
 /**
- * Bulk-insert chunks — used when parsing an entire file into chunks.
+ * Bulk-insert chunks — used when storing all chunks for a parsed repository.
+ *
+ * Guarantees that returned items match the exact order of `chunksArray`
+ * with their generated database `id` and `qdrant_point_id`.
  */
 const createMany = async (chunksArray) => {
-  if (chunksArray.length === 0) return [];
+  if (!chunksArray || chunksArray.length === 0) return [];
 
-  const placeholders = chunksArray.map(() => '(?, ?, ?, ?, ?)').join(', ');
-  const values = chunksArray.flatMap((c) => [
+  const normalized = chunksArray.map((c) => ({
+    fileId: c.fileId || c.file_id,
+    qdrantPointId: c.qdrantPointId || c.qdrant_point_id || null,
+    startLine: c.startLine !== undefined ? c.startLine : c.start_line,
+    endLine: c.endLine !== undefined ? c.endLine : c.end_line,
+    language: c.language || null,
+  }));
+
+  const placeholders = normalized.map(() => '(?, ?, ?, ?, ?)').join(', ');
+  const values = normalized.flatMap((c) => [
     c.fileId,
-    c.qdrantPointId || null,
+    c.qdrantPointId,
     c.startLine,
     c.endLine,
-    c.language || null,
+    c.language,
   ]);
 
   const sql = `INSERT INTO code_chunks (file_id, qdrant_point_id, start_line, end_line, language) VALUES ${placeholders}`;
-  await pool.execute(sql, values);
+  const [result] = await pool.execute(sql, values);
 
-  return findByFileId(chunksArray[0].fileId);
+  const firstId = result.insertId;
+  return normalized.map((item, index) => ({
+    id: firstId + index,
+    file_id: item.fileId,
+    qdrant_point_id: item.qdrantPointId,
+    start_line: item.startLine,
+    end_line: item.endLine,
+    language: item.language,
+  }));
 };
 
 // ── READ ────────────────────────────────────────────────────────────────────
@@ -58,10 +92,20 @@ const findByFileId = async (fileId) => {
 
 // ── DELETE ──────────────────────────────────────────────────────────────────
 
+const deleteByRepositoryId = async (repositoryId) => {
+  const sql = `
+    DELETE cc FROM code_chunks cc
+    INNER JOIN files f ON cc.file_id = f.id
+    WHERE f.repository_id = ?
+  `;
+  const [result] = await pool.execute(sql, [repositoryId]);
+  return result.affectedRows;
+};
+
 const remove = async (id) => {
   const sql = 'DELETE FROM code_chunks WHERE id = ?';
   const [result] = await pool.execute(sql, [id]);
   return result.affectedRows > 0;
 };
 
-module.exports = { create, createMany, findById, findByFileId, remove };
+module.exports = { create, createMany, findById, findByFileId, deleteByRepositoryId, remove };
