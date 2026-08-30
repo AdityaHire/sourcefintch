@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { SourceCitation, Repository } from '../types';
+import { Copy, Check, ExternalLink, Code2, X, FileCode } from 'lucide-react';
 
 interface CodeViewerProps {
   citation: SourceCitation | null;
@@ -12,15 +13,25 @@ export default function CodeViewer({ citation, activeRepo, onClose }: CodeViewer
 
   if (!citation) {
     return (
-      <div className="flex h-full flex-col items-center justify-center border-l border-white/[0.08] bg-zinc-950/80 p-8 text-center backdrop-blur-xl">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.02] text-zinc-500 mb-4 shadow-inner">
-          <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-          </svg>
+      <div className="relative flex h-full w-full flex-col items-center justify-center border-l border-zinc-200/80 dark:border-zinc-800/60 bg-white/40 dark:bg-[#0a0a0c]/50 backdrop-blur-md p-8 text-center select-none font-sans-ui">
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-4 right-4 flex items-center gap-1 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all cursor-pointer shadow-xs"
+          >
+            <X className="w-3.5 h-3.5" />
+            <span>Back to Chat</span>
+          </button>
+        )}
+        <div className="w-12 h-12 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-center font-code text-base text-zinc-400 dark:text-zinc-500 mb-4 shadow-xs">
+          <Code2 className="w-6 h-6 text-zinc-400 dark:text-zinc-500" />
         </div>
-        <h3 className="text-sm font-semibold text-zinc-300 mb-1">Code Viewer</h3>
-        <p className="max-w-xs text-xs leading-relaxed text-zinc-500">
-          Click any citation chip in the conversation to inspect its exact source chunk, line numbers, and GitHub link.
+        <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 mb-1.5 font-sans-ui">
+          Source Code Inspector
+        </h3>
+        <p className="max-w-[260px] text-xs leading-relaxed text-zinc-500 font-sans-ui">
+          Select any cited source in chat or ask a question to inspect verified repository lines.
         </p>
       </div>
     );
@@ -43,110 +54,96 @@ export default function CodeViewer({ citation, activeRepo, onClose }: CodeViewer
     }
   };
 
-  const lines = (citation.content || '// No chunk content available.').split('\n');
+  const lines = (citation.content || '// No code chunk content available.').split('\n');
   const scorePct = Math.round((citation.score || 0) * 100);
 
   return (
-    <div className="flex h-full flex-col border-l border-white/[0.08] bg-zinc-950/95 backdrop-blur-xl">
-      {/* ── Top Header ────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between border-b border-white/[0.08] bg-zinc-900/60 px-4 py-3">
-        <div className="flex items-center gap-2 overflow-hidden">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-400">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+    <div className="flex h-full w-full flex-col border-l border-zinc-200/80 dark:border-zinc-800/60 bg-white/50 dark:bg-[#0a0a0c]/60 backdrop-blur-md font-sans-ui select-none">
+      {/* ── Top Header: File Info & Controls ──────────────────────────────── */}
+      <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/70 dark:bg-zinc-900/50 px-4 py-2.5">
+        <div className="flex items-center gap-2.5 overflow-hidden min-w-0">
+          <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-700 dark:text-zinc-300 shrink-0">
+            <FileCode className="w-3.5 h-3.5" />
           </div>
-          <div className="truncate">
-            <div className="text-xs font-semibold text-white truncate font-mono" title={citation.file_path}>
+          <div className="truncate min-w-0">
+            <div className="text-[13px] font-semibold text-zinc-900 dark:text-white truncate font-code" title={citation.file_path}>
               {citation.file_path}
             </div>
-            <div className="flex items-center gap-2 text-[10px] text-zinc-400 font-mono">
+            <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 dark:text-zinc-400 font-code">
               <span>Lines {citation.start_line}–{citation.end_line}</span>
-              <span>·</span>
-              <span className="text-violet-300 font-medium">{scorePct}% match</span>
+              <span className="text-zinc-300 dark:text-zinc-700">·</span>
+              <span className="text-zinc-600 dark:text-zinc-400 font-medium">{scorePct}% relevance</span>
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer"
-              title="Close viewer"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ── Action Toolbar ────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between border-b border-white/[0.06] bg-black/40 px-4 py-2 text-xs">
-        <span className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider">
-          Source Chunk Preview
-        </span>
-
-        <div className="flex items-center gap-2">
           {/* Copy button */}
           <button
             type="button"
             onClick={handleCopyCode}
-            className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer"
+            className="flex items-center gap-1 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer shadow-2xs font-sans-ui"
+            title="Copy code to clipboard"
           >
             {copied ? (
               <>
-                <svg className="h-3.5 w-3.5 text-emerald-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-                <span className="text-emerald-400">Copied</span>
+                <Check className="h-3 w-3 text-zinc-600 dark:text-zinc-300" />
+                <span className="text-zinc-600 dark:text-zinc-300">Copied</span>
               </>
             ) : (
               <>
-                <svg className="h-3.5 w-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
+                <Copy className="h-3 w-3 text-zinc-400" />
                 <span>Copy</span>
               </>
             )}
           </button>
 
-          {/* Open on GitHub link */}
+          {/* GitHub permalink */}
           {repoUrl && (
             <a
               href={githubLink}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-2.5 py-1 text-[11px] font-medium text-indigo-300 hover:bg-indigo-500/20 hover:text-indigo-200 transition-all"
-              title={githubLink}
+              className="flex items-center gap-1 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors shadow-2xs font-sans-ui"
+              title="Open permalink on GitHub"
             >
               <span>GitHub</span>
-              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
+              <ExternalLink className="w-2.5 h-2.5 text-zinc-400" />
             </a>
+          )}
+
+          {/* Exit Fullscreen / Close button */}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex items-center gap-1 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 px-2.5 py-1 text-xs font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-all cursor-pointer shadow-xs ml-1 font-sans-ui"
+              title="Back to conversation"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Back to Chat</span>
+            </button>
           )}
         </div>
       </div>
 
-      {/* ── Line-Numbered Code Area ───────────────────────────────────────── */}
-      <div className="flex-1 overflow-auto bg-zinc-950 p-4 font-mono text-xs">
+      {/* ── Line-Numbered Code Inspector ─────────────────────────────────── */}
+      <div className="flex-1 overflow-auto bg-white/40 dark:bg-transparent p-0 font-code text-[12.5px] select-text">
         <div className="table w-full border-collapse">
           {lines.map((lineText, idx) => {
             const currentLineNumber = (citation.start_line || 1) + idx;
             return (
               <div
                 key={idx}
-                className="table-row group hover:bg-white/[0.04] transition-colors"
+                className="table-row group hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors"
               >
                 {/* Line number gutter */}
-                <span className="table-cell select-none pr-4 text-right text-zinc-600 group-hover:text-zinc-400 w-10 py-0.5 border-r border-white/[0.06]">
+                <span className="table-cell select-none pr-3 text-right text-zinc-400 dark:text-zinc-600 group-hover:text-zinc-600 dark:group-hover:text-zinc-400 w-12 py-0.5 pl-4 border-r border-zinc-100 dark:border-zinc-800/80 leading-5 bg-zinc-50/20 dark:bg-transparent">
                   {currentLineNumber}
                 </span>
 
                 {/* Line code text */}
-                <span className="table-cell pl-4 text-zinc-200 whitespace-pre py-0.5 leading-relaxed font-mono">
+                <span className="table-cell pl-4 text-zinc-800 dark:text-zinc-200 whitespace-pre py-0.5 leading-5 font-code">
                   {lineText || ' '}
                 </span>
               </div>

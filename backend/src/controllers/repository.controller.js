@@ -181,6 +181,34 @@ const listCompletedRepositories = async (req, res, next) => {
   }
 };
 
+const deleteRepository = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const repository = await Repository.findById(id);
+
+    if (!repository) {
+      const err = new Error('Repository not found');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    try {
+      await CodeChunk.deleteByRepositoryId(id);
+    } catch {
+      // Ignore if no chunks
+    }
+
+    await Repository.remove(id);
+    res.json({
+      success: true,
+      message: 'Repository deleted successfully',
+      id: Number(id),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   listCompletedRepositories,
   createRepository,
@@ -188,5 +216,6 @@ module.exports = {
   getRepositoryFiles,
   updateRepositoryStatus,
   deleteRepositoryChunks,
+  deleteRepository,
 };
 

@@ -1,6 +1,19 @@
-import { useState } from 'react';
+"use client";
+
+import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import type { Repository } from '../types';
-import { createRepository, getRepository } from '../services/api';
+import { createRepository, getRepository, deleteRepository } from '../services/api';
+import { RepoIngestionLoader } from '@/components/ui/repo-ingestion-loader';
+import {
+  Plus,
+  Trash2,
+  FolderGit2,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  X,
+} from 'lucide-react';
 
 interface SidebarProps {
   repositories: Repository[];
@@ -8,6 +21,7 @@ interface SidebarProps {
   onSelectRepo: (repoId: number) => void;
   isLoading: boolean;
   onRepoAdded: (newRepo: Repository) => void;
+  onRepoDeleted?: (deletedRepoId: number) => void;
   isOpenMobile?: boolean;
   onCloseMobile?: () => void;
 }
@@ -18,9 +32,11 @@ export default function Sidebar({
   onSelectRepo,
   isLoading,
   onRepoAdded,
+  onRepoDeleted,
   isOpenMobile = false,
   onCloseMobile,
 }: SidebarProps) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [githubUrl, setGithubUrl] = useState('');
@@ -29,11 +45,31 @@ export default function Sidebar({
   const [indexingStatus, setIndexingStatus] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const filteredRepos = repositories.filter(
-    (repo) =>
-      repo.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      repo.owner.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Delete repository state
+  const [repoToDelete, setRepoToDelete] = useState<Repository | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Deduplicate repositories by ID to prevent duplicate items in sidebar
+  const uniqueRepos = useMemo(() => {
+    const map = new Map<number, Repository>();
+    repositories.forEach((r) => {
+      if (!map.has(r.id)) {
+        map.set(r.id, r);
+      }
+    });
+    return Array.from(map.values());
+  }, [repositories]);
+
+  const filteredRepos = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return uniqueRepos;
+    return uniqueRepos.filter(
+      (repo) =>
+        repo.name.toLowerCase().includes(query) ||
+        repo.owner.toLowerCase().includes(query)
+    );
+  }, [uniqueRepos, searchQuery]);
 
   const handleAddRepo = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,147 +121,335 @@ export default function Sidebar({
     }
   };
 
+  const handleConfirmDelete = async () => {
+    if (!repoToDelete || isDeleting) return;
+
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      await deleteRepository(repoToDelete.id);
+      if (onRepoDeleted) {
+        onRepoDeleted(repoToDelete.id);
+      }
+      setRepoToDelete(null);
+    } catch (err: any) {
+      setDeleteError(err.message || 'Failed to remove repository');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <>
-      <aside
-        className={`flex flex-col border-r border-white/[0.08] bg-zinc-950/95 backdrop-blur-xl transition-all duration-300 z-20 shrink-0 ${
-          isOpenMobile
-            ? 'fixed inset-y-0 left-0 w-80 shadow-2xl block'
-            : 'hidden md:flex md:w-72 lg:w-80'
-        }`}
+      {/* ── Desktop Animated Collapsible Sidebar ──────────────────────── */}
+      <motion.aside
+        animate={{
+          width: isCollapsed ? 64 : 290,
+        }}
+        transition={{
+          duration: 0.3,
+          ease: [0.25, 1, 0.5, 1],
+        }}
+        className={`relative hidden md:flex flex-col border-r border-zinc-200/80 dark:border-zinc-800/60 bg-white/40 dark:bg-[#0a0a0c]/50 backdrop-blur-md z-20 shrink-0 select-none overflow-hidden h-full`}
       >
-        {/* Header with Add Repo button */}
-        <div className="flex items-center justify-between border-b border-white/[0.08] p-4">
-          <div className="flex items-center gap-2">
-            <svg className="h-4 w-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-            </svg>
-            <span className="text-xs font-semibold uppercase tracking-wider text-zinc-300">
-              Repositories ({repositories.length})
-            </span>
-          </div>
+        {/* ── Top Header Bar ────────────────────────────────────────── */}
+        <div className="flex items-center justify-between border-b border-zinc-200/80 dark:border-zinc-800/60 px-3 py-3 bg-white/40 dark:bg-transparent min-h-[49px]">
+          <AnimatePresence initial={false}>
+            {!isCollapsed && (
+              <motion.div
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.2 }}
+                className="flex items-center gap-2 overflow-hidden whitespace-nowrap"
+              >
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-sans-ui">
+                  Repositories
+                </span>
+                <span className="font-code text-[11px] rounded bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-1.5 py-0.2 text-zinc-600 dark:text-zinc-400 font-medium">
+                  {uniqueRepos.length}
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setIsModalOpen(true)}
-              className="flex items-center gap-1 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-2.5 py-1 text-xs font-medium text-indigo-300 hover:bg-indigo-500/20 hover:text-indigo-200 transition-all cursor-pointer"
-              title="Add a new GitHub repository"
-            >
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              <span>Add Repo</span>
-            </button>
-            {isOpenMobile && onCloseMobile && (
+          <div className="flex items-center gap-1.5 ml-auto">
+            {/* Add Repo Button */}
+            {!isCollapsed ? (
+              <motion.button
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                type="button"
+                onClick={() => setIsModalOpen(true)}
+                className="flex items-center gap-1.5 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 px-2.5 py-1 text-[11.5px] font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-all cursor-pointer shadow-xs font-sans-ui whitespace-nowrap"
+                title="Add a new GitHub repository"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Repo</span>
+              </motion.button>
+            ) : (
               <button
                 type="button"
-                onClick={onCloseMobile}
-                className="md:hidden text-zinc-400 hover:text-white p-1 text-sm cursor-pointer"
+                onClick={() => setIsModalOpen(true)}
+                className="p-1.5 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-all cursor-pointer shadow-xs"
+                title="Add GitHub repository"
               >
-                ✕
+                <Plus className="w-3.5 h-3.5" />
               </button>
             )}
-          </div>
-        </div>
 
-        {/* Search input */}
-        <div className="p-3 border-b border-white/[0.06]">
-          <div className="relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search repositories..."
-              className="w-full rounded-lg border border-white/[0.08] bg-zinc-900/80 px-3 py-1.5 pl-8 text-xs text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            />
-            <svg
-              className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-zinc-500"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+            {/* Minimal Collapse / Expand Slider Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="p-1 rounded-md text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/60 transition-all cursor-pointer shrink-0"
+              title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+              {isCollapsed ? (
+                <ChevronRight className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronLeft className="w-3.5 h-3.5" />
+              )}
+            </button>
           </div>
         </div>
 
-        {/* Repository List */}
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+        {/* ── Search Input (Expanded only) ──────────────────────────── */}
+        <AnimatePresence>
+          {!isCollapsed && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="p-3 border-b border-zinc-200/60 dark:border-zinc-800/50 overflow-hidden"
+            >
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search repositories..."
+                  className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 px-3 py-1.5 pl-8 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-zinc-400 dark:focus:border-zinc-700 focus:outline-none transition-all font-sans-ui shadow-2xs"
+                />
+                <Search className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500" />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Repository List ───────────────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
           {isLoading ? (
-            <div className="p-4 text-center text-xs text-zinc-500 animate-pulse">
-              Loading repositories...
+            <div className="p-4 text-center text-xs text-zinc-500 font-sans-ui animate-subtle-pulse">
+              {!isCollapsed && 'Loading repositories...'}
             </div>
           ) : filteredRepos.length === 0 ? (
-            <div className="p-6 text-center text-xs text-zinc-500">
-              {searchQuery ? 'No repositories match your search.' : 'No completed repositories found.'}
-            </div>
+            !isCollapsed && (
+              <div className="p-4 text-center">
+                <p className="text-xs text-zinc-500 font-sans-ui">
+                  {searchQuery ? 'No matching repositories.' : 'No repositories yet.'}
+                </p>
+              </div>
+            )
           ) : (
             filteredRepos.map((repo) => {
               const isSelected = repo.id === selectedRepoId;
+
+              if (isCollapsed) {
+                // Collapsed icon-only rail item with tooltip
+                return (
+                  <button
+                    key={repo.id}
+                    type="button"
+                    onClick={() => onSelectRepo(repo.id)}
+                    className={`relative w-full p-2.5 rounded-xl flex items-center justify-center transition-all cursor-pointer group ${
+                      isSelected
+                        ? 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-xs'
+                        : 'border border-transparent hover:bg-white/80 dark:hover:bg-zinc-900/50 hover:border-zinc-200/60 dark:hover:border-zinc-800/80 text-zinc-500 hover:text-zinc-900 dark:hover:text-white'
+                    }`}
+                    title={`${repo.name} (${repo.branch || 'main'})`}
+                  >
+                    <FolderGit2
+                      className={`w-4 h-4 ${
+                        isSelected
+                          ? 'text-zinc-900 dark:text-white'
+                          : 'text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white'
+                      }`}
+                    />
+                    {isSelected && (
+                      <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-zinc-700 dark:bg-zinc-300" />
+                    )}
+                  </button>
+                );
+              }
+
+              // Expanded full repository card
               return (
-                <button
+                <div
                   key={repo.id}
-                  type="button"
-                  onClick={() => {
-                    onSelectRepo(repo.id);
-                    if (onCloseMobile) onCloseMobile();
-                  }}
-                  className={`w-full text-left rounded-xl p-3 transition-all cursor-pointer group flex flex-col gap-1.5 border ${
+                  onClick={() => onSelectRepo(repo.id)}
+                  className={`group relative w-full text-left rounded-xl p-3 transition-all cursor-pointer flex flex-col gap-1.5 ${
                     isSelected
-                      ? 'border-indigo-500/50 bg-indigo-600/15 shadow-sm shadow-indigo-500/10'
-                      : 'border-transparent hover:border-white/[0.08] hover:bg-white/[0.03]'
+                      ? 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-xs ring-1 ring-zinc-400/20 dark:ring-zinc-600/20'
+                      : 'border border-transparent hover:bg-white/80 dark:hover:bg-zinc-900/50 hover:border-zinc-200/60 dark:hover:border-zinc-800/80'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className={`text-xs font-semibold truncate ${isSelected ? 'text-indigo-200' : 'text-zinc-200 group-hover:text-white'}`}>
-                      {repo.owner}/{repo.name}
+                  {/* Top row: Dominant Repository Name + Actions */}
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      className={`text-[13px] font-semibold truncate tracking-tight font-sans-ui ${
+                        isSelected
+                          ? 'text-zinc-900 dark:text-white'
+                          : 'text-zinc-700 dark:text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-white'
+                      }`}
+                    >
+                      {repo.owner ? `${repo.owner} / ${repo.name}` : repo.name}
                     </span>
-                    <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-mono">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                      Ready
-                    </span>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {/* Delete button on hover */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRepoToDelete(repo);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-1 text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-md transition-all cursor-pointer"
+                        title={`Remove ${repo.name}`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-2 text-[11px] text-zinc-500 font-mono">
-                    <span className="flex items-center gap-1 truncate max-w-[140px]">
-                      <svg className="h-3 w-3 text-zinc-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                      </svg>
-                      {repo.branch || 'main'}
-                    </span>
-                    <span>·</span>
-                    <span>{repo.file_count} files</span>
+                  {/* Subline: Branch, File Count & Subtle Ready Status */}
+                  <div className="flex items-center justify-between text-[11.5px] text-zinc-500 dark:text-zinc-400 font-sans-ui">
+                    <div className="flex items-center gap-1.5 font-code">
+                      <span className="truncate">{repo.branch || 'main'}</span>
+                      <span className="text-zinc-300 dark:text-zinc-700">·</span>
+                      <span>{repo.file_count || 0} files</span>
+                    </div>
+
+                    <div className="flex items-center gap-1 text-[11px] text-zinc-600 dark:text-zinc-400 font-medium">
+                      <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 dark:bg-zinc-400 inline-block" />
+                      <span>Ready</span>
+                    </div>
                   </div>
-                </button>
+                </div>
               );
             })
           )}
         </div>
-      </aside>
+      </motion.aside>
 
-      {/* Add Repository Modal */}
+      {/* ── Mobile Sidebar Drawer ─────────────────────────────────────── */}
+      <AnimatePresence>
+        {isOpenMobile && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={onCloseMobile}
+              className="fixed inset-0 bg-black/50 backdrop-blur-xs z-30 md:hidden"
+            />
+            <motion.aside
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className="fixed inset-y-0 left-0 w-80 shadow-2xl bg-white dark:bg-[#0a0a0c] z-40 md:hidden flex flex-col border-r border-zinc-200 dark:border-zinc-800"
+            >
+              <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                    Repositories
+                  </span>
+                  <span className="font-code text-xs rounded bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-zinc-600 dark:text-zinc-300">
+                    {uniqueRepos.length}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsModalOpen(true)}
+                    className="flex items-center gap-1 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 px-2.5 py-1 text-xs font-semibold shadow-xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Repo</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onCloseMobile}
+                    className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Search */}
+              <div className="p-3 border-b border-zinc-200/60 dark:border-zinc-800/50">
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search repositories..."
+                    className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-1.5 pl-8 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none"
+                  />
+                  <Search className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-zinc-400" />
+                </div>
+              </div>
+
+              {/* Mobile Repo List */}
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {filteredRepos.map((repo) => (
+                  <div
+                    key={repo.id}
+                    onClick={() => {
+                      onSelectRepo(repo.id);
+                      if (onCloseMobile) onCloseMobile();
+                    }}
+                    className={`w-full rounded-xl p-3 text-left border ${
+                      repo.id === selectedRepoId
+                        ? 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700'
+                        : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900'
+                    }`}
+                  >
+                    <div className="font-semibold text-sm text-zinc-900 dark:text-white truncate">
+                      {repo.name}
+                    </div>
+                    <div className="text-xs text-zinc-500 font-code mt-1">
+                      {repo.branch || 'main'} · {repo.file_count || 0} files
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── Add Repository Modal ──────────────────────────────────────── */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl border border-white/[0.1] bg-zinc-900 p-6 shadow-2xl animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold text-white flex items-center gap-2">
-                <svg className="h-5 w-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Add GitHub Repository
-              </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-700 dark:text-zinc-300">
+                  <FolderGit2 className="w-3.5 h-3.5" />
+                </div>
+                <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Add GitHub Repository</h3>
+              </div>
               <button
                 type="button"
-                onClick={() => {
-                  if (!isSubmitting) {
-                    setIsModalOpen(false);
-                    setErrorMessage(null);
-                    setIndexingStatus(null);
-                  }
-                }}
+                onClick={() => !isSubmitting && setIsModalOpen(false)}
                 disabled={isSubmitting}
-                className="text-zinc-400 hover:text-white cursor-pointer"
+                className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 p-1 text-sm rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-40"
               >
                 ✕
               </button>
@@ -233,76 +457,118 @@ export default function Sidebar({
 
             <form onSubmit={handleAddRepo} className="space-y-4">
               <div>
-                <label htmlFor="repo-url" className="block text-xs font-medium text-zinc-300 mb-1.5">
-                  GitHub Repository URL:
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5 font-sans-ui">
+                  GitHub Repository URL <span className="text-rose-500">*</span>
                 </label>
                 <input
-                  id="repo-url"
-                  type="url"
+                  type="text"
                   required
                   placeholder="https://github.com/owner/repository"
                   value={githubUrl}
                   onChange={(e) => setGithubUrl(e.target.value)}
                   disabled={isSubmitting}
-                  className="w-full rounded-xl border border-white/[0.1] bg-zinc-950 px-3.5 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 px-3.5 py-2 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:border-zinc-400 focus:bg-white dark:focus:bg-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-400/40 font-sans-ui"
                 />
               </div>
 
               <div>
-                <label htmlFor="repo-branch" className="block text-xs font-medium text-zinc-300 mb-1.5">
-                  Branch (Optional, defaults to default branch):
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5 font-sans-ui">
+                  Branch <span className="text-zinc-400 font-normal">(optional, default: default branch)</span>
                 </label>
                 <input
-                  id="repo-branch"
                   type="text"
-                  placeholder="e.g. main or master"
+                  placeholder="main, master, etc."
                   value={branch}
                   onChange={(e) => setBranch(e.target.value)}
                   disabled={isSubmitting}
-                  className="w-full rounded-xl border border-white/[0.1] bg-zinc-950 px-3.5 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 px-3.5 py-2 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:border-zinc-400 focus:bg-white dark:focus:bg-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-400/40 font-sans-ui"
                 />
               </div>
 
-              {indexingStatus && (
-                <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/10 p-3 text-xs text-indigo-300 flex items-center gap-2.5">
-                  <div className="h-3.5 w-3.5 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin shrink-0" />
-                  <span>{indexingStatus}</span>
-                </div>
-              )}
-
               {errorMessage && (
-                <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300">
+                <div className="rounded-xl bg-rose-500/10 border border-rose-500/20 p-3 text-xs text-rose-600 dark:text-rose-400 font-sans-ui">
                   {errorMessage}
                 </div>
               )}
 
-              <div className="flex justify-end gap-2.5 pt-2">
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-zinc-100 dark:border-zinc-800">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
                   disabled={isSubmitting}
-                  className="rounded-xl border border-white/[0.1] bg-zinc-800 px-4 py-2 text-xs font-medium text-zinc-300 hover:bg-zinc-700 cursor-pointer disabled:opacity-50"
+                  className="rounded-xl border border-zinc-200 dark:border-zinc-800 px-4 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all disabled:opacity-40 font-sans-ui"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={!githubUrl.trim() || isSubmitting}
-                  className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-medium text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-500 cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                  disabled={isSubmitting || !githubUrl.trim()}
+                  className="rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 px-4 py-2 text-xs font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-all shadow-xs disabled:opacity-40 font-sans-ui"
                 >
-                  {isSubmitting ? (
-                    <>
-                      <div className="h-3 w-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                      <span>Ingesting...</span>
-                    </>
-                  ) : (
-                    <span>Ingest Repository</span>
-                  )}
+                  {isSubmitting ? 'Submitting...' : 'Ingest Repository'}
                 </button>
               </div>
             </form>
           </div>
         </div>
+      )}
+
+      {/* ── Delete Confirmation Modal ─────────────────────────────────── */}
+      {repoToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-2xl font-sans-ui">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
+                <Trash2 className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-zinc-900 dark:text-white">
+                  Remove Repository
+                </h3>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-zinc-600 dark:text-zinc-300 mb-4 leading-relaxed">
+              Are you sure you want to remove <span className="font-semibold text-zinc-900 dark:text-white">{repoToDelete.name}</span> from Sourcefinch? All indexed chunks and metadata for this repository will be permanently deleted.
+            </p>
+
+            {deleteError && (
+              <div className="rounded-xl bg-rose-500/10 border border-rose-500/20 p-2.5 text-xs text-rose-600 dark:text-rose-400 mb-4">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => !isDeleting && setRepoToDelete(null)}
+                disabled={isDeleting}
+                className="rounded-xl border border-zinc-200 dark:border-zinc-800 px-3.5 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all disabled:opacity-40"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="rounded-xl bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-1.5 text-xs font-semibold transition-all shadow-xs disabled:opacity-40"
+              >
+                {isDeleting ? 'Removing...' : 'Delete Repository'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Fullscreen Ingestion Modal (GSAP Smooth Progress) ─────────── */}
+      {isSubmitting && (
+        <RepoIngestionLoader
+          repoName={githubUrl}
+          statusText={indexingStatus || undefined}
+        />
       )}
     </>
   );

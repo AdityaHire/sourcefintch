@@ -1,29 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+@import "./styles/fonts.css";
 
 /*
- * Global base styles.
- *
- * Tailwind v4 uses @import instead of @tailwind directives.
- * Custom CSS below sets the dark background and smooth defaults.
+ * Sourcefinch Design System & Global Styles
+ * Clean, high-readability design system supporting both light and dark aesthetics.
  */
 
 /* ── Base reset & defaults ─────────────────────────── */
-html {
+:root {
+  color-scheme: light;
+}
+
+html.dark {
   color-scheme: dark;
 }
 
 body {
-  @apply bg-zinc-950 text-white antialiased;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  @apply bg-zinc-50 text-zinc-900 antialiased;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
 }
 
-/* ── Smooth scrolling ──────────────────────────────── */
-html {
-  scroll-behavior: smooth;
+html.dark body {
+  @apply bg-zinc-950 text-zinc-100;
 }
 
 /* ── Selection color ───────────────────────────────── */
 ::selection {
+  @apply bg-indigo-500/20 text-indigo-900;
+}
+
+html.dark ::selection {
   @apply bg-indigo-500/30 text-white;
 }
 
@@ -34,13 +45,71 @@ html {
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-transparent;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply rounded-full bg-zinc-700;
+  background-color: #e4e4e7;
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-zinc-600;
+  background-color: #d4d4d8;
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background-color: #27272a;
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background-color: #3f3f46;
+}
+
+/* ── Keyframe Animations ───────────────────────────── */
+@keyframes fadeRise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-rise {
+  animation: fadeRise 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fade-rise-delay {
+  opacity: 0;
+  animation: fadeRise 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.15s forwards;
+}
+
+@keyframes subtlePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.animate-subtle-pulse {
+  animation: subtlePulse 2s ease-in-out infinite;
+}
+
+/* ── Prefers Reduced Motion ────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .animate-fade-rise,
+  .animate-fade-rise-delay,
+  .animate-subtle-pulse {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }

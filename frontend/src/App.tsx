@@ -1,79 +1,365 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ChatInterface from './components/ChatInterface';
-import Dashboard from './pages/Dashboard';
+import CinematicLandingHero from './components/CinematicLandingHero';
+import LandingPageContent from './components/LandingPageContent';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { ShaderBackground } from '@/components/ui/waves-shader';
+import { ValleyOfTheMindShader } from '@/components/ui/valley-of-the-mind';
+import { checkBackendHealth, checkAIServiceHealth } from './services/api';
+import type { HealthResponse } from './types';
 
 export default function App() {
-  const [activeView, setActiveView] = useState<'workspace' | 'health'>('workspace');
+  const [isHealthOpen, setIsHealthOpen] = useState(false);
+  const [isDocsOpen, setIsDocsOpen] = useState(false);
+  const [backendHealth, setBackendHealth] = useState<'online' | 'unreachable' | 'checking'>('checking');
+  const [aiHealth, setAiHealth] = useState<'online' | 'unreachable' | 'checking'>('checking');
+  const [backendDetails, setBackendDetails] = useState<HealthResponse | null>(null);
+  const [aiDetails, setAiDetails] = useState<HealthResponse | null>(null);
+
+  // Theme support: default to 'light'
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const saved = localStorage.getItem('sf_theme');
+    return saved === 'dark' ? 'dark' : 'light';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('sf_theme', theme);
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
+
+  // Determine current active view based on URL pathname & params
+  const [activeTab, setActiveTab] = useState<'workspace' | 'landing'>(() => {
+    const path = window.location.pathname;
+    const params = new URLSearchParams(window.location.search);
+    if (path.startsWith('/workspace') || params.has('conversationId')) {
+      return 'workspace';
+    }
+    return path === '/' && !params.has('conversationId') ? 'landing' : 'workspace';
+  });
+
+  // Handle URL history sync and popstate
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname;
+      const params = new URLSearchParams(window.location.search);
+      if (path.startsWith('/workspace') || params.has('conversationId')) {
+        setActiveTab('workspace');
+      } else {
+        setActiveTab('landing');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigateTo = (tab: 'workspace' | 'landing') => {
+    setActiveTab(tab);
+    const search = window.location.search;
+    if (tab === 'workspace') {
+      window.history.pushState(null, '', '/workspace' + search);
+    } else {
+      window.history.pushState(null, '', '/' + search);
+    }
+  };
+
+  // Poll service health periodically
+  useEffect(() => {
+    let isMounted = true;
+    const runHealthCheck = async () => {
+      try {
+        const b = await checkBackendHealth();
+        if (isMounted) {
+          setBackendHealth('online');
+          setBackendDetails(b);
+        }
+      } catch {
+        if (isMounted) setBackendHealth('unreachable');
+      }
+
+      try {
+        const a = await checkAIServiceHealth();
+        if (isMounted) {
+          setAiHealth('online');
+          setAiDetails(a);
+        }
+      } catch {
+        if (isMounted) setAiHealth('unreachable');
+      }
+    };
+
+    runHealthCheck();
+    const interval = setInterval(runHealthCheck, 30000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  const allServicesHealthy = backendHealth === 'online' && aiHealth === 'online';
+
+  // Shared Navbar Component
+  const Navbar = ({ isWorkspace = false }: { isWorkspace?: boolean }) => (
+    <nav
+      className={`h-16 w-full shrink-0 flex items-center justify-between px-6 sm:px-12 z-40 transition-colors backdrop-blur-md ${
+        isWorkspace
+          ? 'border-b border-zinc-200/80 dark:border-zinc-800/60 bg-white/60 dark:bg-[#0a0a0c]/60'
+          : 'bg-transparent border-none'
+      }`}
+    >
+      {/* Brand Logo */}
+      <button
+        type="button"
+        onClick={() => navigateTo('landing')}
+        className="flex items-center gap-2.5 group cursor-pointer text-left"
+        title="Sourcefinch"
+      >
+        {/* Emerald Teal Logo Icon with White Lightning */}
+        <div className="w-7 h-7 rounded-lg bg-teal-500 flex items-center justify-center text-white shadow-xs">
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </div>
+        <span className="text-[17px] font-semibold tracking-tight text-zinc-900 dark:text-white font-sans-ui">
+          Sourcefinch
+        </span>
+      </button>
+
+      {/* Navigation items */}
+      <div className="flex items-center gap-6 sm:gap-8 text-[13.5px] font-sans-ui">
+        <button
+          type="button"
+          onClick={() => navigateTo('landing')}
+          className={`transition-colors cursor-pointer py-1 ${
+            activeTab === 'landing'
+              ? 'text-zinc-900 dark:text-white font-semibold border-b-2 border-zinc-900 dark:border-white'
+              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white font-medium'
+          }`}
+        >
+          Overview
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigateTo('workspace')}
+          className={`transition-colors cursor-pointer py-1 ${
+            activeTab === 'workspace'
+              ? 'text-zinc-900 dark:text-white font-semibold border-b-2 border-zinc-900 dark:border-white'
+              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white font-medium'
+          }`}
+        >
+          Workspace
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setIsDocsOpen(true)}
+          className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer font-medium"
+        >
+          Docs
+        </button>
+
+        {/* Animated ThemeToggle */}
+        <ThemeToggle
+          isDark={theme === 'dark'}
+          onToggle={(isDark) => setTheme(isDark ? 'dark' : 'light')}
+        />
+      </div>
+    </nav>
+  );
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-zinc-950 text-white selection:bg-indigo-500/30">
-      {/* Background ambient gradients */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden z-0">
-        <div className="absolute -top-40 -left-40 h-96 w-96 rounded-full bg-indigo-600/10 blur-[128px]" />
-        <div className="absolute -right-40 -bottom-40 h-96 w-96 rounded-full bg-violet-600/10 blur-[128px]" />
-      </div>
-
-      {/* Compact Top Header */}
-      <header className="relative z-30 flex h-14 shrink-0 items-center justify-between border-b border-white/[0.08] bg-zinc-900/60 px-4 sm:px-6 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-tr from-indigo-500 to-violet-500 text-white font-black text-xs shadow-md shadow-indigo-500/20">
-            SF
+    <div className="h-screen w-full bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans-ui selection:bg-indigo-500/20 dark:selection:bg-indigo-500/30 selection:text-indigo-900 dark:selection:text-white flex flex-col overflow-hidden">
+      {/* ── VIEW SWITCHER: WORKSPACE vs FULLSCREEN SEAMLESS LANDING ────── */}
+      {activeTab === 'workspace' ? (
+        /* ── Fullscreen IDE Workspace View with Valley of the Mind Shader ── */
+        <div className="relative h-screen w-full flex flex-col overflow-hidden bg-gradient-to-br from-zinc-50/90 via-white/80 to-zinc-100/70 dark:from-[#09090b] dark:via-[#0c0c0e] dark:to-[#0a0a0d]">
+          {/* Continuous Valley of the Mind animated shader across entire workspace */}
+          <div className="fixed inset-0 z-0 pointer-events-none opacity-40 dark:opacity-30 overflow-hidden">
+            <ValleyOfTheMindShader className="h-full w-full" />
           </div>
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-sm bg-gradient-to-r from-indigo-200 via-violet-200 to-purple-200 bg-clip-text text-transparent">
-              Sourcefinch
-            </span>
-            <span className="text-[10px] font-mono rounded bg-white/[0.05] border border-white/[0.08] px-1.5 py-0.2 text-zinc-400">
-              Workspace
-            </span>
+
+          <div className="relative z-10 w-full">
+            <Navbar isWorkspace={true} />
+          </div>
+          <main className="relative z-10 flex-1 w-full h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
+            <ChatInterface />
+          </main>
+        </div>
+      ) : (
+        /* ── Seamless Full-Viewport Landing Page ─────────────────────────── */
+        <div className="relative h-screen w-full flex flex-col overflow-y-auto bg-white dark:bg-zinc-950">
+          {/* Waves Shader Layer spanning the entire window from (0,0) */}
+          <div className="fixed inset-0 z-0 pointer-events-none opacity-25 dark:opacity-40 overflow-hidden">
+            <ShaderBackground className="h-full w-full" />
+          </div>
+
+          {/* Soft ambient gradient overlay spanning full viewport */}
+          <div className="fixed inset-0 z-0 pointer-events-none bg-radial from-transparent via-white/40 to-white/90 dark:via-zinc-950/40 dark:to-zinc-950/90" />
+
+          {/* Header directly on top of the continuous shader */}
+          <div className="relative z-30 w-full">
+            <Navbar isWorkspace={false} />
+          </div>
+
+          {/* Cinematic Animated Hero Content */}
+          <CinematicLandingHero onExplore={() => navigateTo('workspace')} />
+
+          {/* Antigravity & NotebookLM Inspired Scrollable Showcase & Footer */}
+          <LandingPageContent
+            onExplore={() => navigateTo('workspace')}
+            onOpenDocs={() => setIsDocsOpen(true)}
+          />
+        </div>
+      )}
+
+      {/* ── MODAL: SYSTEM HEALTH ─────────────────────────────────────────── */}
+      {isHealthOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in font-sans-ui">
+          <div className="w-full max-w-lg rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-5 border-b border-zinc-100 dark:border-zinc-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <span
+                  className={`h-2.5 w-2.5 rounded-full ${
+                    allServicesHealthy ? 'bg-emerald-500' : 'bg-amber-400'
+                  }`}
+                />
+                <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">System Services Status</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsHealthOpen(false)}
+                className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 cursor-pointer text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3.5">
+              <div className="rounded-xl border border-zinc-100 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/60 p-4">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-200">Backend API</span>
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-[10px] font-code uppercase tracking-wider ${
+                      backendHealth === 'online'
+                        ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-400'
+                        : 'bg-rose-100 dark:bg-rose-500/10 text-rose-800 dark:text-rose-400'
+                    }`}
+                  >
+                    {backendHealth}
+                  </span>
+                </div>
+                <p className="text-[11px] text-zinc-500 leading-relaxed mb-2 font-sans-ui">
+                  Node.js + Express (:3001) — REST API, MySQL migrations, and GitHub repository ingestion.
+                </p>
+                {backendDetails && (
+                  <pre className="rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-2 text-[10px] font-code text-zinc-700 dark:text-zinc-400 overflow-x-auto">
+                    {JSON.stringify(backendDetails, null, 2)}
+                  </pre>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-zinc-100 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/60 p-4">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-200">AI Service</span>
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-[10px] font-code uppercase tracking-wider ${
+                      aiHealth === 'online'
+                        ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-400'
+                        : 'bg-rose-100 dark:bg-rose-500/10 text-rose-800 dark:text-rose-400'
+                    }`}
+                  >
+                    {aiHealth}
+                  </span>
+                </div>
+                <p className="text-[11px] text-zinc-500 leading-relaxed mb-2 font-sans-ui">
+                  Python + FastAPI (:8000) — AST chunking, embeddings, Qdrant vector retrieval, and LLM RAG engine.
+                </p>
+                {aiDetails && (
+                  <pre className="rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-2 text-[10px] font-code text-zinc-700 dark:text-zinc-400 overflow-x-auto">
+                    {JSON.stringify(aiDetails, null, 2)}
+                  </pre>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsHealthOpen(false)}
+                className="rounded-lg bg-zinc-100 dark:bg-zinc-800 px-4 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
+      )}
 
-        {/* View Switcher / System Health */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setActiveView('workspace')}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-medium transition-all cursor-pointer ${
-              activeView === 'workspace'
-                ? 'bg-white/[0.1] text-white shadow-sm border border-white/[0.1]'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
-            }`}
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-            </svg>
-            <span>Workspace</span>
-          </button>
+      {/* ── MODAL: DOCUMENTATION ─────────────────────────────────────────── */}
+      {isDocsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in font-sans-ui">
+          <div className="w-full max-w-xl rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-3">
+              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                <span>Sourcefinch</span>
+                <span className="text-zinc-400">· Guide</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsDocsOpen(false)}
+                className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 cursor-pointer text-sm"
+              >
+                ✕
+              </button>
+            </div>
 
-          <button
-            type="button"
-            onClick={() => setActiveView('health')}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-medium transition-all cursor-pointer ${
-              activeView === 'health'
-                ? 'bg-white/[0.1] text-white shadow-sm border border-white/[0.1]'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
-            }`}
-            title="Inspect backend & AI service status"
-          >
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Health</span>
-          </button>
-        </div>
-      </header>
+            <div className="space-y-4 text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed font-sans-ui">
+              <section>
+                <h4 className="font-semibold text-zinc-900 dark:text-zinc-200 mb-1">1. Connect a Repository</h4>
+                <p>
+                  Click <strong>+ Add Repo</strong> in the left sidebar. Paste any public GitHub repository URL (e.g. <code>https://github.com/expressjs/express</code>) and optionally specify a branch.
+                </p>
+              </section>
 
-      {/* Main Workspace View */}
-      <main className="relative z-10 flex-1 overflow-hidden">
-        {activeView === 'workspace' ? (
-          <ChatInterface />
-        ) : (
-          <div className="h-full overflow-y-auto p-6 max-w-5xl mx-auto">
-            <Dashboard />
+              <section>
+                <h4 className="font-semibold text-zinc-900 dark:text-zinc-200 mb-1">2. Ingestion & Embedding</h4>
+                <p>
+                  Sourcefinch clones the repo shallowly, parses code files into semantic AST chunks, embeds them into high-dimensional vectors, and indexes them in Qdrant.
+                </p>
+              </section>
+
+              <section>
+                <h4 className="font-semibold text-zinc-900 dark:text-zinc-200 mb-1">3. Natural Language Q&A</h4>
+                <p>
+                  Select the repository in the sidebar and type any question into the chat prompt. The AI service performs dense vector search to retrieve relevant code snippets, synthesizes an answer, and attaches line-level citations.
+                </p>
+              </section>
+
+              <section>
+                <h4 className="font-semibold text-zinc-900 dark:text-zinc-200 mb-1">4. Line Permalinks & Inspection</h4>
+                <p>
+                  Click any citation badge to view the exact code snippet in the right panel or click <strong>GitHub</strong> to jump directly to the permalink on GitHub.
+                </p>
+              </section>
+            </div>
+
+            <div className="mt-6 flex justify-end border-t border-zinc-100 dark:border-zinc-800 pt-3">
+              <button
+                type="button"
+                onClick={() => setIsDocsOpen(false)}
+                className="rounded-lg bg-black dark:bg-white text-white dark:text-black px-4 py-1.5 text-xs font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-200 cursor-pointer"
+              >
+                Got it
+              </button>
+            </div>
           </div>
-        )}
-      </main>
+        </div>
+      )}
     </div>
   );
 }
-
-

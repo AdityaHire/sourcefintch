@@ -10,6 +10,7 @@ const {
   getRepositoryFiles,
   updateRepositoryStatus,
   deleteRepositoryChunks,
+  deleteRepository,
 } = require('../controllers/repository.controller');
 
 const router = Router();
@@ -22,6 +23,9 @@ router.post('/', createRepository);
 
 // GET /api/repositories/:id
 router.get('/:id', getRepository);
+
+// DELETE /api/repositories/:id — delete repository and cascade its data
+router.delete('/:id', deleteRepository);
 
 // GET /api/repositories/:id/files
 router.get('/:id/files', getRepositoryFiles);

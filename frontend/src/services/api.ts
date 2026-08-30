@@ -114,6 +114,20 @@ export async function getRepository(id: number): Promise<Repository> {
 }
 
 /**
+ * Delete a repository and its associated indexed chunks.
+ */
+export async function deleteRepository(id: number): Promise<{ success: boolean; id: number }> {
+  const res = await fetch(`/api/repositories/${id}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || `Failed to delete repository (${res.status})`);
+  }
+  return res.json();
+}
+
+/**
  * Send a chat message through Node's orchestrator.
  */
 export async function sendChatMessage(payload: {

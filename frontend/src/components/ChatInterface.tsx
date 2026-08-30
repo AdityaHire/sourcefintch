@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Sidebar from './Sidebar';
 import CodeViewer from './CodeViewer';
+import MarkdownRenderer from './MarkdownRenderer';
+import { ThinkingTool } from '@/components/ui/thinking-tool';
 import {
   fetchCompletedRepositories,
   fetchConversation,
@@ -11,6 +13,18 @@ import type {
   ChatMessage,
   SourceCitation,
 } from '../types';
+import {
+  Code,
+  Plus,
+  ArrowUp,
+  FileCode,
+  Sparkles,
+  Menu,
+  Bug,
+  Layers,
+  Code2,
+  FileSearch,
+} from 'lucide-react';
 
 export default function ChatInterface() {
   const [repositories, setRepositories] = useState<Repository[]>([]);
@@ -24,7 +38,7 @@ export default function ChatInterface() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedCitation, setSelectedCitation] = useState<SourceCitation | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [isMobileCodeOpen, setIsMobileCodeOpen] = useState(false);
+  const [isCodeViewerOpen, setIsCodeViewerOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -38,6 +52,18 @@ export default function ChatInterface() {
     scrollToBottom();
   }, [messages, isSubmitting]);
 
+  // ── Auto-resize composer textarea ─────────────────────────────────────────
+  const adjustTextareaHeight = () => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 160)}px`;
+    }
+  };
+
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [inputQuery]);
+
   // ── 1. Initial Load: Repositories & URL-Driven Persistence ────────────────
   useEffect(() => {
     let isMounted = true;
@@ -49,7 +75,7 @@ export default function ChatInterface() {
         if (!isMounted) return;
         setRepositories(repos);
 
-        // Check URL search params for existing conversation_id (URL-driven ONLY)
+        // Check URL search params for existing conversation_id
         const params = new URLSearchParams(window.location.search);
         const convParam = params.get('conversationId');
 
@@ -63,7 +89,7 @@ export default function ChatInterface() {
             setMessages(convData.messages || []);
             setSelectedRepoId(convData.repository_id);
 
-            // Auto-select the first citation in history if present
+            // Auto-select first citation without forcing panel open
             const firstWithSources = convData.messages?.find(
               (m) => m.role === 'assistant' && m.sources && m.sources.length > 0
             );
@@ -73,19 +99,17 @@ export default function ChatInterface() {
           } catch (convErr: any) {
             if (!isMounted) return;
             setErrorMessage(`Failed to load conversation #${convId}: ${convErr.message}`);
-            // Clear invalid param
             window.history.replaceState(null, '', window.location.pathname);
             setConversationId(null);
           } finally {
             if (isMounted) setIsLoadingConv(false);
           }
         } else if (repos.length > 0) {
-          // Default to the first completed repository
           setSelectedRepoId(repos[0].id);
         }
       } catch (err: any) {
         if (!isMounted) return;
-        setErrorMessage(err.message || 'Failed to load completed repositories');
+        setErrorMessage(err.message || 'Failed to load repositories');
       } finally {
         if (isMounted) setIsLoadingRepos(false);
       }
@@ -98,46 +122,68 @@ export default function ChatInterface() {
     };
   }, []);
 
-  // ── 2. Handle "New Chat" ──────────────────────────────────────────────────
+  // ── Switch repository ─────────────────────────────────────────────────────
+  const handleRepoChange = (newRepoId: number) => {
+    setSelectedRepoId(newRepoId);
+    setConversationId(null);
+    setMessages([]);
+    setSelectedCitation(null);
+    setIsCodeViewerOpen(false);
+    setErrorMessage(null);
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete('conversationId');
+    window.history.pushState(null, '', url.pathname + url.search);
+  };
+
+  // ── New Chat in current repository ────────────────────────────────────────
   const handleNewChat = () => {
     setConversationId(null);
     setMessages([]);
-    setErrorMessage(null);
     setSelectedCitation(null);
-    setInputQuery('');
+    setIsCodeViewerOpen(false);
+    setErrorMessage(null);
 
-    // Remove ?conversationId from URL without reloading
     const url = new URL(window.location.href);
     url.searchParams.delete('conversationId');
-    window.history.pushState(null, '', url.pathname + (url.search || ''));
+    window.history.pushState(null, '', url.pathname + url.search);
+
+    textareaRef.current?.focus();
   };
 
-  // ── 3. Handle Repository Change ───────────────────────────────────────────
-  const handleRepoChange = (newRepoId: number) => {
-    setSelectedRepoId(newRepoId);
-    handleNewChat();
-  };
-
-  // ── 4. Handle Repository Added from Sidebar ───────────────────────────────
   const handleRepoAdded = (newRepo: Repository) => {
+    setRepositories((prev) => [newRepo, ...prev.filter((r) => r.id !== newRepo.id)]);
+    setSelectedRepoId(newRepo.id);
+  };
+
+  const handleRepoDeleted = (deletedRepoId: number) => {
     setRepositories((prev) => {
-      const exists = prev.some((r) => r.id === newRepo.id);
-      if (exists) return prev.map((r) => (r.id === newRepo.id ? newRepo : r));
-      return [newRepo, ...prev];
+      const remaining = prev.filter((r) => r.id !== deletedRepoId);
+      if (selectedRepoId === deletedRepoId) {
+        if (remaining.length > 0) {
+          handleRepoChange(remaining[0].id);
+        } else {
+          setSelectedRepoId(null);
+          setConversationId(null);
+          setMessages([]);
+          setSelectedCitation(null);
+          setIsCodeViewerOpen(false);
+        }
+      }
+      return remaining;
     });
   };
 
-  // ── 5. Send Message ───────────────────────────────────────────────────────
-  const handleSendMessage = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!inputQuery.trim() || !selectedRepoId || isSubmitting) return;
+  // ── Send chat message ─────────────────────────────────────────────────────
+  const handleSendMessage = async (customPrompt?: string) => {
+    const userText = (customPrompt || inputQuery).trim();
+    if (!userText || !selectedRepoId || isSubmitting) return;
 
-    const userText = inputQuery.trim();
     setInputQuery('');
     setErrorMessage(null);
 
-    // Optimistically append user message to UI
     const optimisticUserMsg: ChatMessage = {
+      id: Date.now(),
       role: 'user',
       content: userText,
       created_at: new Date().toISOString(),
@@ -152,7 +198,6 @@ export default function ChatInterface() {
         message: userText,
       });
 
-      // Update active conversation ID and URL if newly created
       if (!conversationId && response.conversation_id) {
         setConversationId(response.conversation_id);
         const url = new URL(window.location.href);
@@ -160,7 +205,6 @@ export default function ChatInterface() {
         window.history.pushState(null, '', url.pathname + url.search);
       }
 
-      // Append assistant message
       const assistantMsg: ChatMessage = {
         id: response.message.id,
         role: 'assistant',
@@ -170,7 +214,7 @@ export default function ChatInterface() {
       };
       setMessages((prev) => [...prev, assistantMsg]);
 
-      // If citations returned, auto-focus first citation in CodeViewer
+      // Cache latest citation for Show Code inspection
       if (response.message.sources && response.message.sources.length > 0) {
         setSelectedCitation(response.message.sources[0]);
       }
@@ -191,13 +235,54 @@ export default function ChatInterface() {
 
   const handleCitationClick = (citation: SourceCitation) => {
     setSelectedCitation(citation);
-    setIsMobileCodeOpen(true);
+    setIsCodeViewerOpen(true);
   };
 
-  const activeRepo = repositories.find((r) => r.id === selectedRepoId) || null;
+  // Direct code opener for markdown tokens
+  const handleOpenCode = (filePath: string, startLine?: number, endLine?: number) => {
+    // Check if matching citation exists in messages
+    let foundCitation: SourceCitation | null = null;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const s = messages[i].sources?.find(
+        (src) => src.file_path.includes(filePath) || filePath.includes(src.file_path)
+      );
+      if (s) {
+        foundCitation = s;
+        break;
+      }
+    }
+
+    if (foundCitation) {
+      setSelectedCitation(foundCitation);
+    } else {
+      setSelectedCitation({
+        file_path: filePath,
+        start_line: startLine || 1,
+        end_line: endLine || startLine || 1,
+        content: `// Source code snippet for ${filePath}:${startLine || 1}-${endLine || startLine || 1}`,
+        score: 0.95,
+      });
+    }
+    setIsCodeViewerOpen(true);
+  };
+
+  const activeRepo = useMemo(
+    () => repositories.find((r) => r.id === selectedRepoId) || null,
+    [repositories, selectedRepoId]
+  );
+  const hasTextToSend = inputQuery.trim().length > 0;
+
+  // Suggested starter prompts
+  const starterPrompts = [
+    { label: 'Explain this project', icon: Sparkles, query: 'Explain the high-level architecture and purpose of this project.' },
+    { label: 'Find bugs & edge cases', icon: Bug, query: 'Analyze the codebase and identify any bugs, missing error handling, or edge cases.' },
+    { label: 'How does routing work?', icon: Layers, query: 'How is routing and request handling implemented across the codebase?' },
+    { label: 'Find unused or dead code', icon: FileSearch, query: 'Look for any unused functions, redundant variables, or obsolete code blocks.' },
+    { label: 'Explain data flow', icon: Code2, query: 'Explain the main data flow and state management throughout the repository.' },
+  ];
 
   return (
-    <div className="flex h-[calc(100vh-3.75rem)] w-full overflow-hidden bg-zinc-950">
+    <div className="flex h-full w-full overflow-hidden bg-transparent font-sans-ui text-zinc-900 dark:text-zinc-100 select-none">
       {/* ── 1. LEFT PANEL: Sidebar (Repositories) ─────────────────────────── */}
       <Sidebar
         repositories={repositories}
@@ -205,76 +290,83 @@ export default function ChatInterface() {
         onSelectRepo={handleRepoChange}
         isLoading={isLoadingRepos}
         onRepoAdded={handleRepoAdded}
+        onRepoDeleted={handleRepoDeleted}
         isOpenMobile={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
 
       {/* ── 2. CENTER PANEL: Chat Workspace ───────────────────────────────── */}
-      <div className="flex flex-1 flex-col h-full min-w-0 bg-zinc-950/60 overflow-hidden">
-        {/* Top Chat Subheader */}
-        <div className="flex items-center justify-between border-b border-white/[0.08] bg-zinc-900/40 px-4 sm:px-6 py-3 shrink-0">
+      <div className="relative flex flex-1 flex-col h-full min-w-0 overflow-hidden bg-white/20 dark:bg-transparent">
+        {/* ── Top Repository Bar ──────────────────────────────────────────── */}
+        <div className="flex items-center justify-between border-b border-zinc-200/80 dark:border-zinc-800/60 bg-white/50 dark:bg-[#0c0c0e]/50 px-4 sm:px-6 py-2.5 shrink-0 backdrop-blur-md z-10">
+          {/* Left: Dominant repo name + branch & indexed status */}
           <div className="flex items-center gap-3 min-w-0">
-            {/* Mobile menu trigger */}
             <button
               type="button"
               onClick={() => setIsMobileSidebarOpen(true)}
-              className="md:hidden rounded-lg p-1.5 text-zinc-400 hover:bg-white/[0.08] hover:text-white cursor-pointer"
-              title="Open repositories sidebar"
+              className="md:hidden rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white cursor-pointer transition-colors"
+              title="Open repositories"
             >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
+              <Menu className="w-4 h-4" />
             </button>
 
-            <div className="truncate">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-white truncate">
-                  {activeRepo ? `${activeRepo.owner}/${activeRepo.name}` : 'Select a Repository'}
-                </span>
-                {activeRepo && (
-                  <span className="rounded bg-indigo-500/10 border border-indigo-500/20 px-1.5 py-0.2 text-[10px] font-mono text-indigo-300">
+            <div className="flex items-center gap-2.5 truncate">
+              <span className="text-[14px] font-semibold text-zinc-900 dark:text-white font-sans-ui truncate">
+                {activeRepo ? `${activeRepo.owner} / ${activeRepo.name}` : 'Select a Repository'}
+              </span>
+
+              {activeRepo && (
+                <div className="hidden sm:flex items-center gap-1.5 text-[12px] text-zinc-500 dark:text-zinc-400 font-sans-ui">
+                  <span className="rounded-md bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 px-1.5 py-0.5 font-code text-[11px] text-zinc-600 dark:text-zinc-400">
                     {activeRepo.branch || 'main'}
                   </span>
-                )}
-              </div>
-              {activeRepo && (
-                <div className="text-[11px] text-zinc-500 font-mono truncate">
-                  {activeRepo.file_count} indexed files · Qdrant ready
+                  <span>·</span>
+                  <span>{activeRepo.file_count || 0} files</span>
+                  <span>·</span>
+                  <span className="flex items-center gap-1 text-zinc-600 dark:text-zinc-400 font-medium">
+                    <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 dark:bg-zinc-400 inline-block" />
+                    Indexed
+                  </span>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Mobile code viewer toggle */}
-            {selectedCitation && (
-              <button
-                type="button"
-                onClick={() => setIsMobileCodeOpen(!isMobileCodeOpen)}
-                className="xl:hidden flex items-center gap-1 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-xs font-medium text-violet-300 hover:bg-violet-500/20 cursor-pointer"
-              >
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                </svg>
-                <span>Code</span>
-              </button>
-            )}
+          {/* Right: Show Code, Chat ID & Primary + New Chat Button */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Show Code toggle button */}
+            <button
+              type="button"
+              onClick={() => {
+                if (!isCodeViewerOpen && !selectedCitation) {
+                  for (let i = messages.length - 1; i >= 0; i--) {
+                    if (messages[i].sources && messages[i].sources!.length > 0) {
+                      setSelectedCitation(messages[i].sources![0]);
+                      break;
+                    }
+                  }
+                }
+                setIsCodeViewerOpen(!isCodeViewerOpen);
+              }}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer shadow-xs font-sans-ui ${
+                isCodeViewerOpen
+                  ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-200 ring-1 ring-zinc-700 dark:ring-zinc-300'
+                  : 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-100'
+              }`}
+              title={isCodeViewerOpen ? 'Hide code viewer' : 'Show code viewer'}
+            >
+              <Code className="w-3.5 h-3.5" />
+              <span>{isCodeViewerOpen ? 'Hide Code' : 'Show Code'}</span>
+            </button>
 
-            {conversationId && (
-              <span className="hidden sm:inline-block rounded-full bg-white/[0.04] border border-white/[0.08] px-2.5 py-0.5 text-[11px] text-zinc-400 font-mono">
-                Thread #{conversationId}
-              </span>
-            )}
-
+            {/* Primary Action: + New Chat */}
             <button
               type="button"
               onClick={handleNewChat}
               disabled={isSubmitting || (messages.length === 0 && !conversationId)}
-              className="flex items-center gap-1.5 rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-zinc-200 transition-all hover:bg-white/[0.1] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              className="flex items-center gap-1.5 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 px-3 py-1.5 text-xs font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-all cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed font-sans-ui"
             >
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
+              <Plus className="w-3.5 h-3.5" />
               <span>New Chat</span>
             </button>
           </div>
@@ -282,193 +374,238 @@ export default function ChatInterface() {
 
         {/* Error Banner */}
         {errorMessage && (
-          <div className="flex items-center justify-between border-b border-red-500/20 bg-red-500/10 px-6 py-2.5 text-xs text-red-300 shrink-0">
-            <div className="flex items-center gap-2">
-              <svg className="h-4 w-4 shrink-0 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-              <span>{errorMessage}</span>
-            </div>
+          <div className="flex items-center justify-between border-b border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/[0.06] px-4 sm:px-6 py-2.5 text-xs text-rose-900 dark:text-rose-200 shrink-0 font-sans-ui">
+            <span>{errorMessage}</span>
             <button
               type="button"
               onClick={() => setErrorMessage(null)}
-              className="text-red-400 hover:text-red-200 cursor-pointer font-bold ml-4"
+              className="text-rose-500 hover:text-rose-700 dark:hover:text-rose-100 cursor-pointer ml-3 font-semibold"
             >
-              ✕
+              Dismiss
             </button>
           </div>
         )}
 
-        {/* Message Feed */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+        {/* ── Scrollable Conversation Stream ───────────────────────────────── */}
+        <div className="relative z-1 flex-1 overflow-y-auto px-4 sm:px-8 py-5 select-text">
           {isLoadingConv ? (
-            <div className="flex h-full items-center justify-center text-zinc-500 gap-2">
-              <div className="h-4 w-4 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin" />
-              <span className="text-sm">Re-hydrating conversation from database...</span>
+            <div className="flex h-full items-center justify-center text-zinc-400 text-xs font-sans-ui animate-subtle-pulse">
+              Loading conversation history...
             </div>
           ) : messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center text-zinc-500 py-12">
-              <div className="h-12 w-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-4 shadow-lg shadow-indigo-500/10">
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
+            /* ── Empty State with Suggested Starters ───────────────────────── */
+            <div className="flex h-full flex-col items-center justify-center max-w-xl mx-auto text-center px-4 my-auto select-none">
+              <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-700 dark:text-zinc-300 mb-4 shadow-xs">
+                <Sparkles className="w-6 h-6" />
               </div>
-              <h3 className="text-base font-semibold text-zinc-200 mb-1">
-                Chat with {activeRepo ? `${activeRepo.owner}/${activeRepo.name}` : 'Codebase'}
-              </h3>
-              <p className="text-xs text-zinc-500 max-w-sm">
-                Ask anything about functions, APIs, architecture, or configuration. Citations open directly in the Code Viewer panel on the right.
+
+              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-white mb-2 font-sans-ui">
+                {activeRepo ? `Explore ${activeRepo.name}` : 'Select a Repository'}
+              </h2>
+              <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 max-w-md leading-relaxed mb-8 font-sans-ui">
+                Ask any architectural or bug investigation question. Answers are grounded in your indexed source code.
               </p>
+
+              {/* Suggested Questions Grid */}
+              <div className="w-full text-left space-y-2">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 px-1 font-sans-ui">
+                  Try asking:
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {starterPrompts.map((item, idx) => {
+                    const Icon = item.icon;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleSendMessage(item.query)}
+                        disabled={!selectedRepoId || isSubmitting}
+                        className="flex items-center gap-2.5 rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 p-3 text-left text-xs text-zinc-700 dark:text-zinc-300 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white transition-all cursor-pointer shadow-2xs font-sans-ui group disabled:opacity-50"
+                      >
+                        <Icon className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400 shrink-0 group-hover:scale-110 transition-transform" />
+                        <span className="font-medium truncate">{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           ) : (
-            messages.map((msg, index) => {
-              const isUser = msg.role === 'user';
-              return (
-                <div
-                  key={index}
-                  className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} space-y-1.5`}
-                >
-                  <div className="flex items-center gap-2 text-[11px] text-zinc-500 px-1 font-mono">
-                    <span>{isUser ? 'You' : 'Sourcefinch AI'}</span>
-                    {msg.created_at && (
-                      <span>· {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                    )}
-                  </div>
-
+            /* ── Compact, High-Density Conversation Messages ─────────────── */
+            <div className="max-w-3xl mx-auto w-full space-y-5">
+              {messages.map((msg, index) => {
+                const isUser = msg.role === 'user';
+                return (
                   <div
-                    className={`max-w-2xl rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                      isUser
-                        ? 'bg-indigo-600/30 border border-indigo-500/40 text-indigo-50 rounded-tr-sm'
-                        : 'bg-white/[0.04] border border-white/[0.08] text-zinc-200 rounded-tl-sm'
+                    key={index}
+                    className={`flex flex-col ${
+                      index > 0 && !isUser ? 'pt-4 border-t border-zinc-100 dark:border-zinc-900/80' : ''
                     }`}
                   >
-                    {/* Message Content */}
-                    <div className="whitespace-pre-wrap">{msg.content}</div>
-
-                    {/* Multi-turn isolated retrieval guidance tip on fallback */}
-                    {!isUser && msg.content.includes("couldn't find enough evidence") && index > 1 && (
-                      <div className="mt-3 flex items-start gap-2 rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-xs text-amber-200/90 font-sans">
-                        <span className="text-amber-400 font-bold shrink-0">💡 Tip:</span>
-                        <span>
-                          Questions are currently evaluated independently. Try including the repository or file name explicitly (e.g. <em>&quot;How do I run {activeRepo?.name || 'this repo'}?&quot;</em>).
+                    {/* Header: Identity & Timestamp */}
+                    <div className={`flex items-center gap-2 text-[11.5px] mb-1.5 font-sans-ui ${isUser ? 'justify-end' : 'justify-start'}`}>
+                      <span className={`font-medium ${isUser ? 'text-zinc-500 dark:text-zinc-400' : 'text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5'}`}>
+                        {!isUser && (
+                          <span className="w-4 h-4 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-[9px] font-code text-zinc-700 dark:text-zinc-300 font-bold">
+                            SF
+                          </span>
+                        )}
+                        {isUser ? 'You' : 'Sourcefinch'}
+                      </span>
+                      {msg.created_at && (
+                        <span className="text-zinc-400 dark:text-zinc-600 font-code text-[10.5px]">
+                          · {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
+                      )}
+                    </div>
+
+                    {/* Message Content */}
+                    {isUser ? (
+                      /* User message: clean compact bubble aligned right */
+                      <div className="flex justify-end">
+                        <div className="max-w-[65ch] rounded-xl px-4 py-2 text-[13.5px] leading-relaxed bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 whitespace-pre-wrap font-sans-ui shadow-2xs">
+                          {msg.content}
+                        </div>
                       </div>
-                    )}
+                    ) : (
+                      /* Assistant message: structured document format */
+                      <div className="flex flex-col items-start w-full">
+                        <MarkdownRenderer content={msg.content} onOpenCode={handleOpenCode} />
 
-                    {/* Assistant Source Citations */}
-                    {!isUser && msg.sources && msg.sources.length > 0 && (
-                      <div className="mt-3.5 pt-2.5 border-t border-white/[0.08]">
-                        <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center gap-1">
-                          <svg className="h-3 w-3 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          Citations ({msg.sources.length}):
-                        </div>
+                        {/* ── CITED SOURCES · Prominent Interactive Table ── */}
+                        {msg.sources && msg.sources.length > 0 && (
+                          <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-900/80 w-full max-w-[72ch]">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="text-[11px] font-semibold tracking-wider text-zinc-500 dark:text-zinc-400 uppercase font-sans-ui flex items-center gap-1.5">
+                                <FileCode className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
+                                <span>Cited Sources · {msg.sources.length}</span>
+                              </div>
+                              <span className="text-[10.5px] text-zinc-400 dark:text-zinc-500 font-sans-ui">
+                                Click row to inspect code
+                              </span>
+                            </div>
 
-                        {/* Citation Chips */}
-                        <div className="flex flex-wrap gap-1.5">
-                          {msg.sources.map((source: SourceCitation, sIdx: number) => {
-                            const isSelected =
-                              selectedCitation?.file_path === source.file_path &&
-                              selectedCitation?.start_line === source.start_line &&
-                              selectedCitation?.end_line === source.end_line;
-                            const scorePct = Math.round((source.score || 0) * 100);
+                            {/* Source Rows Table */}
+                            <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 overflow-hidden divide-y divide-zinc-100 dark:divide-zinc-800/60 shadow-2xs">
+                              {msg.sources.map((source: SourceCitation, sIdx: number) => {
+                                const isSelected =
+                                  isCodeViewerOpen &&
+                                  selectedCitation?.file_path === source.file_path &&
+                                  selectedCitation?.start_line === source.start_line &&
+                                  selectedCitation?.end_line === source.end_line;
+                                const scorePct = Math.round((source.score || 0) * 100);
 
-                            return (
-                              <button
-                                key={sIdx}
-                                type="button"
-                                onClick={() => handleCitationClick(source)}
-                                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-mono transition-all cursor-pointer ${
-                                  isSelected
-                                    ? 'border-violet-500 bg-violet-500/25 text-violet-100 shadow-sm shadow-violet-500/20'
-                                    : 'border-white/[0.08] bg-white/[0.02] text-zinc-400 hover:border-violet-400/40 hover:bg-white/[0.06] hover:text-zinc-200'
-                                }`}
-                              >
-                                <span className="text-zinc-200 font-medium">
-                                  {source.file_path}:{source.start_line}-{source.end_line}
-                                </span>
-                                <span className="rounded bg-black/40 px-1 py-0.2 text-[10px] text-zinc-400">
-                                  {scorePct}%
-                                </span>
-                                <span className="text-[10px] text-violet-300">
-                                  {isSelected ? '▶' : '→'}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
+                                return (
+                                  <button
+                                    key={sIdx}
+                                    type="button"
+                                    onClick={() => handleCitationClick(source)}
+                                    className={`w-full flex items-center justify-between px-3.5 py-2 text-left font-code text-xs transition-colors cursor-pointer ${
+                                      isSelected
+                                        ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium'
+                                        : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className={isSelected ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400'}>
+                                        📄
+                                      </span>
+                                      <span className="truncate font-semibold text-[12px]">{source.file_path}</span>
+                                    </div>
+
+                                    <div className="flex items-center gap-4 shrink-0 text-[11px] text-zinc-500 dark:text-zinc-400">
+                                      <span>
+                                        {source.start_line === source.end_line
+                                          ? `Line ${source.start_line}`
+                                          : `Lines ${source.start_line}–${source.end_line}`}
+                                      </span>
+                                      <span className="rounded bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.2 text-[10.5px] font-semibold text-zinc-700 dark:text-zinc-300">
+                                        {scorePct}%
+                                      </span>
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
-                </div>
-              );
-            })
-          )}
+                );
+              })}
 
-          {/* Loading state bubble */}
-          {isSubmitting && (
-            <div className="flex flex-col items-start space-y-1.5">
-              <div className="text-[11px] text-zinc-500 px-1 font-mono">Sourcefinch AI</div>
-              <div className="rounded-2xl rounded-tl-sm border border-violet-500/30 bg-violet-950/20 px-4 py-3 text-sm text-violet-300 flex items-center gap-3">
-                <div className="flex space-x-1">
-                  <div className="h-2 w-2 bg-violet-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
-                  <div className="h-2 w-2 bg-violet-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
-                  <div className="h-2 w-2 bg-violet-400 rounded-full animate-bounce" />
+              {/* ── Minimal thinking indicator while generating ──────────── */}
+              {isSubmitting && (
+                <div className="flex items-center gap-1.5 text-[11.5px] font-sans-ui text-zinc-500 dark:text-zinc-400 pt-2">
+                  <span className="w-4 h-4 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-[9px] font-code text-zinc-700 dark:text-zinc-300 font-bold shrink-0">
+                    SF
+                  </span>
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-100 mr-1">Sourcefinch</span>
+                  <ThinkingTool isThinking={true} />
                 </div>
-                <span>Searching Qdrant vectors & generating answer...</span>
-              </div>
+              )}
+
+              <div ref={messagesEndRef} />
             </div>
           )}
-
-          <div ref={messagesEndRef} />
         </div>
 
-        {/* Message Composer */}
-        <div className="border-t border-white/[0.08] bg-zinc-900/40 p-3 sm:p-4 shrink-0">
-          <form onSubmit={handleSendMessage} className="flex gap-2 sm:gap-3 items-end">
-            <textarea
-              ref={textareaRef}
-              rows={1}
-              value={inputQuery}
-              onChange={(e) => setInputQuery(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={
-                selectedRepoId
-                  ? 'Ask a question about this repository... (Enter to send, Shift+Enter for newline)'
-                  : 'Please select a repository from the left sidebar to start chatting'
-              }
-              disabled={!selectedRepoId || isSubmitting}
-              className="flex-1 resize-none rounded-xl border border-white/[0.1] bg-zinc-900/90 px-4 py-2.5 text-sm text-white placeholder-zinc-500 shadow-inner focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed max-h-32"
-            />
-            <button
-              type="submit"
-              disabled={!inputQuery.trim() || !selectedRepoId || isSubmitting}
-              className="h-10 px-4 sm:px-5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 font-medium text-xs sm:text-sm text-white shadow-lg shadow-indigo-500/25 hover:from-indigo-600 hover:to-violet-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-1.5 transition-all shrink-0"
-            >
-              <span>Send</span>
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-              </svg>
-            </button>
-          </form>
+        {/* ── 3. Bottom Composer: Elevated, Anchored, Professional ─────────── */}
+        <div className="relative z-10 border-t border-zinc-200/80 dark:border-zinc-800/60 bg-white/60 dark:bg-[#0c0c0e]/60 p-3 sm:p-4 shrink-0 backdrop-blur-md">
+          <div className="max-w-3xl mx-auto w-full">
+            <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="relative font-sans-ui">
+              <div className="flex items-center gap-2 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 px-3.5 py-2.5 shadow-md shadow-zinc-200/50 dark:shadow-black/30 focus-within:border-zinc-400 dark:focus-within:border-zinc-600 focus-within:ring-2 focus-within:ring-zinc-400/20 transition-all">
+                <textarea
+                  ref={textareaRef}
+                  rows={1}
+                  value={inputQuery}
+                  onChange={(e) => setInputQuery(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={
+                    selectedRepoId
+                      ? 'Ask anything about this repository...'
+                      : 'Select a repository to start'
+                  }
+                  disabled={!selectedRepoId || isSubmitting}
+                  className="flex-1 resize-none bg-transparent py-1 text-[13.5px] text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed max-h-36 leading-relaxed font-sans-ui select-text"
+                />
+
+                {/* Send Button */}
+                <button
+                  type="submit"
+                  disabled={!hasTextToSend || !selectedRepoId || isSubmitting}
+                  className={`h-7 w-7 rounded-lg flex items-center justify-center transition-all duration-200 shrink-0 ${
+                    hasTextToSend && selectedRepoId && !isSubmitting
+                      ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-200 cursor-pointer shadow-xs scale-100'
+                      : 'bg-zinc-100 dark:bg-zinc-850 text-zinc-400 dark:text-zinc-600 cursor-not-allowed opacity-50'
+                  }`}
+                  title={hasTextToSend ? 'Send message (Enter)' : 'Enter message'}
+                >
+                  <ArrowUp className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Subdued User Benefit Copy */}
+              <div className="mt-1.5 px-1 flex items-center justify-between text-[11px] text-zinc-400 dark:text-zinc-500 font-sans-ui">
+                <span>Answers grounded in your source code</span>
+                <span className="hidden sm:inline font-code text-[10px]">Return ↵ to send</span>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
 
-      {/* ── 3. RIGHT PANEL: Code Viewer ───────────────────────────────────── */}
-      <div
-        className={`shrink-0 transition-all duration-300 z-10 ${
-          isMobileCodeOpen
-            ? 'fixed inset-y-0 right-0 w-full sm:w-[480px] shadow-2xl block'
-            : 'hidden xl:flex xl:w-[420px] 2xl:w-[480px]'
-        }`}
-      >
-        <CodeViewer
-          citation={selectedCitation}
-          activeRepo={activeRepo}
-          onClose={() => setIsMobileCodeOpen(false)}
-        />
-      </div>
+      {/* ── 3. FULLSCREEN CODE INSPECTOR OVERLAY ──────────────────────────── */}
+      {isCodeViewerOpen && (
+        <div className="absolute inset-0 w-full h-full z-30 flex flex-col bg-white/95 dark:bg-[#0c0c0e]/95 backdrop-blur-md animate-in fade-in duration-200">
+          <CodeViewer
+            citation={selectedCitation}
+            activeRepo={activeRepo}
+            onClose={() => setIsCodeViewerOpen(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }
