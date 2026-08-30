@@ -5,74 +5,233 @@ DESIGN PRINCIPLES:
 1. Local-First & Zero-Cost: Defaults to sentence-transformers with
    all-MiniLM-L6-v2 (384 dimensions), running locally on CPU/GPU with
    ₹0 cost and zero external API dependencies.
-2. Singleton Model: The model is loaded once on first use (or app startup)
-   and reused across requests, avoiding expensive re-initialization.
-3. Batched Processing: Generates embeddings in batches for high throughput.
-4. Provider Swappable: Structured so future cloud providers (e.g., OpenAI,
-   Voyage, Gemini) can be configured via EMBEDDING_PROVIDER.
+2. Provider Swappable: EMBEDDING_PROVIDER selects the implementation
+   (local | gemini). Each provider exposes the same `embed(texts)`
+   interface, so ingestion, retrieval, and the RAG pipeline are unchanged.
+3. Singleton Provider: The selected provider is constructed once and reused.
+4. Separate Collections Per Provider: Local (384-d) and Gemini (e.g. 768-d via
+   MRL truncation) vectors must NEVER share a Qdrant collection, because their
+   dimensions differ. get_active_collection_name() returns a provider-scoped
+   collection name so retrieval always targets the collection a repo was
+   indexed with. Switching a repo's provider requires re-ingestion.
+
+Gemini notes:
+- Model: gemini-embedding-001 (text-embedding-004 is deprecated Jan 2026).
+- Native output dimension is 3072; we use MRL output_dimensionality truncation
+  (GEMINI_EMBEDDING_DIMENSION, default 768) to keep vectors compact.
+- The Gemini embed API accepts a single input text per request, so we embed
+  per-text with exponential backoff on 429 (free-tier rate limits).
 """
 
+from __future__ import annotations
+
 import logging
-from typing import Optional
+import time
+from typing import Optional, Protocol
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Global singleton instance of the model
-_model_instance = None
+
+class EmbeddingProvider(Protocol):
+    """Interface every embedding provider must implement."""
+
+    @property
+    def dimension(self) -> int:
+        """Output vector dimension produced by this provider."""
+        ...
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        """Embed a list of texts into a list of float vectors (input order preserved)."""
+        ...
 
 
-def get_embedding_model():
-    """Retrieve or initialize the singleton sentence-transformers model."""
-    global _model_instance
-    if _model_instance is None:
-        provider = settings.embedding_provider.lower()
-        if provider in ("local", "sentence-transformers"):
+# ── Local (sentence-transformers) provider ───────────────────────────────────
+
+class LocalEmbeddingProvider:
+    """Default provider — runs all-MiniLM-L6-v2 locally, zero cost."""
+
+    def __init__(self, model_name: Optional[str] = None):
+        self.model_name = model_name or settings.embedding_model or "all-MiniLM-L6-v2"
+        self._model = None
+
+    def _load_model(self):
+        if self._model is None:
             from sentence_transformers import SentenceTransformer
 
-            model_name = settings.embedding_model or "all-MiniLM-L6-v2"
-            logger.info("Loading local embedding model: %s ...", model_name)
-            _model_instance = SentenceTransformer(model_name)
+            logger.info("Loading local embedding model: %s ...", self.model_name)
+            self._model = SentenceTransformer(self.model_name)
             logger.info(
                 "Embedding model '%s' loaded successfully (dimension: %d)",
-                model_name,
-                get_vector_dimension(),
+                self.model_name,
+                self.dimension,
             )
+        return self._model
+
+    @property
+    def dimension(self) -> int:
+        model = self._load_model()
+        dim = model.get_sentence_embedding_dimension()
+        return int(dim) if dim is not None else 384
+
+    def embed(self, texts: list[str], batch_size: int = 32) -> list[list[float]]:
+        if not texts:
+            return []
+        model = self._load_model()
+        # normalize_embeddings=True produces unit vectors for Cosine similarity
+        embeddings = model.encode(
+            texts,
+            batch_size=batch_size,
+            show_progress_bar=False,
+            normalize_embeddings=True,
+        )
+        return [vec.tolist() for vec in embeddings]
+
+
+# ── Google Gemini provider ───────────────────────────────────────────────────
+
+class GeminiEmbeddingProvider:
+    """Cloud provider using gemini-embedding-001 with MRL dimension truncation.
+
+    Embeds one text per request (Gemini's per-request input model) and retries
+    with exponential backoff on 429 rate-limit errors (free tier).
+    """
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
+        dimension: Optional[int] = None,
+        max_retries: int = 5,
+        base_backoff_s: float = 1.0,
+    ):
+        self.api_key = api_key or settings.gemini_api_key
+        if not self.api_key:
+            raise ValueError(
+                "GEMINI_API_KEY is not configured. Set GEMINI_API_KEY in .env to use the Gemini embedding provider."
+            )
+        self.model = model or settings.gemini_embedding_model or "gemini-embedding-001"
+        # MRL truncation target; native Gemini dimension is 3072.
+        self.dimension = int(dimension if dimension is not None else settings.gemini_embedding_dimension or 768)
+        self.max_retries = max_retries
+        self.base_backoff_s = base_backoff_s
+        self._client = None
+        self._types = None
+
+    def _get_client(self):
+        if self._client is None:
+            # Imported lazily so the SDK is only required when this provider is used.
+            from google import genai
+            from google.genai import types
+
+            logger.info("Initializing Gemini embedding client (model=%s, dim=%d) ...", self.model, self.dimension)
+            self._client = genai.Client(api_key=self.api_key)
+            # Cache the types module so _embed_one never imports google directly.
+            self._types = types
+        return self._client
+
+    @staticmethod
+    def _is_rate_limit(exc: Exception) -> bool:
+        status = getattr(exc, "status_code", None)
+        if status == 429:
+            return True
+        # google-genai sometimes wraps the code in the message.
+        return "429" in str(exc)
+
+    def _embed_one(self, text: str) -> list[float]:
+        # self._types is set by _get_client(); fail loudly if client wasn't initialized.
+        types = getattr(self, "_types", None)
+        if types is None:
+            self._get_client()
+            types = self._types
+
+        client = self._client
+        delay = self.base_backoff_s
+        last_exc: Optional[Exception] = None
+
+        for attempt in range(self.max_retries):
+            try:
+                result = client.models.embed_content(
+                    model=self.model,
+                    contents=text,
+                    config=types.EmbedContentConfig(output_dimensionality=self.dimension),
+                )
+                embedding = result.embeddings[0].values
+                return [float(x) for x in embedding]
+            except Exception as exc:  # noqa: BLE001 - normalize all failures
+                last_exc = exc
+                if self._is_rate_limit(exc) and attempt < self.max_retries - 1:
+                    logger.warning(
+                        "Gemini embedding rate-limited (429) on attempt %d/%d; backing off %.1fs",
+                        attempt + 1,
+                        self.max_retries,
+                        delay,
+                    )
+                    time.sleep(delay)
+                    delay *= 2
+                    continue
+                logger.error("Gemini embedding failed: %s", exc)
+                raise
+
+        raise RuntimeError(f"Gemini embedding failed after {self.max_retries} attempts: {last_exc}")
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        if not texts:
+            return []
+        return [self._embed_one(t) for t in texts]
+
+
+# ── Provider selection + backward-compatible helpers ─────────────────────────
+
+_provider_instance: Optional[EmbeddingProvider] = None
+
+
+def get_embedding_provider() -> EmbeddingProvider:
+    """Return (constructing once) the embedding provider for EMBEDDING_PROVIDER."""
+    global _provider_instance
+    if _provider_instance is None:
+        provider = settings.embedding_provider.lower()
+        if provider in ("local", "sentence-transformers"):
+            _provider_instance = LocalEmbeddingProvider()
+        elif provider == "gemini":
+            _provider_instance = GeminiEmbeddingProvider()
         else:
             raise ValueError(f"Unsupported embedding provider: {settings.embedding_provider}")
-    return _model_instance
+    return _provider_instance
+
+
+def reset_provider() -> None:
+    """Clear the cached provider (used by tests / config reload)."""
+    global _provider_instance
+    _provider_instance = None
 
 
 def get_vector_dimension() -> int:
-    """Return the output vector dimension for the configured model."""
-    model = get_embedding_model()
-    # SentenceTransformer provides get_sentence_embedding_dimension()
-    dim = model.get_sentence_embedding_dimension()
-    return int(dim) if dim is not None else 384
+    """Return the output vector dimension for the configured provider."""
+    return get_embedding_provider().dimension
 
 
 def embed_texts(texts: list[str], batch_size: int = 32) -> list[list[float]]:
-    """Generate vector embeddings for a list of text strings.
-
-    Args:
-        texts: List of chunk text strings to embed.
-        batch_size: Batch size for model inference.
-
-    Returns:
-        List of float vectors, one per input text, matching the input order.
-    """
+    """Generate vector embeddings for a list of text strings (provider-agnostic)."""
     if not texts:
         return []
+    provider = get_embedding_provider()
+    # Gemini embeds per-text; local batches. Both honor the same interface.
+    try:
+        return provider.embed(texts, batch_size=batch_size)
+    except TypeError:
+        # Provider doesn't accept batch_size (e.g. Gemini) — call without it.
+        return provider.embed(texts)
 
-    model = get_embedding_model()
-    # normalize_embeddings=True produces unit vectors for Cosine similarity
-    embeddings = model.encode(
-        texts,
-        batch_size=batch_size,
-        show_progress_bar=False,
-        normalize_embeddings=True,
-    )
 
-    # Convert numpy array to list of float lists for JSON / Qdrant serialization
-    return [vec.tolist() for vec in embeddings]
+def get_active_collection_name() -> str:
+    """Return the Qdrant collection name scoped to the active embedding provider.
+
+    Local and Gemini produce different-dimension vectors, so they must live in
+    separate collections. Switching providers therefore requires re-ingestion.
+    """
+    provider = settings.embedding_provider.lower()
+    if provider == "gemini":
+        return f"{settings.qdrant_collection_name}_gemini"
+    return settings.qdrant_collection_name

@@ -42,7 +42,7 @@ from qdrant_client import models
 
 from app.config import settings
 from app.services.chunking_service import chunk_file
-from app.services.embedding_service import embed_texts, get_vector_dimension
+from app.services.embedding_service import embed_texts, get_vector_dimension, get_active_collection_name
 from app.services.vector_service import (
     delete_by_repository_id,
     ensure_collection,
@@ -299,8 +299,9 @@ async def parse_repository(
         await update_repository_status(repository_id, "embedding")
 
         # ── 6. Ensure Qdrant collection & Dual Idempotency Cleanup ───
-        ensure_collection(settings.qdrant_collection_name, get_vector_dimension())
-        delete_by_repository_id(settings.qdrant_collection_name, repository_id)
+        collection_name = get_active_collection_name()
+        ensure_collection(collection_name, get_vector_dimension())
+        delete_by_repository_id(collection_name, repository_id)
         await delete_repository_chunks(repository_id)
 
         # ── 7. Handle 0-chunk edge case gracefully ────────────────────
@@ -361,7 +362,7 @@ async def parse_repository(
 
         # ── 10. Upsert points into Qdrant with Compensating Rollback ──
         try:
-            upsert_points(settings.qdrant_collection_name, qdrant_points)
+            upsert_points(collection_name, qdrant_points)
         except Exception as qdrant_exc:
             logger.error(
                 "Qdrant upsert failed for repository %d: %s. Performing compensating MySQL cleanup...",

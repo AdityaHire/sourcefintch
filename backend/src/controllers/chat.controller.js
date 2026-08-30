@@ -15,7 +15,7 @@ const AI_CHAT_TIMEOUT_MS = 45_000; // 45s timeout for embedding + retrieval + LL
 
 const handleChat = async (req, res, next) => {
   try {
-    const { conversation_id, repository_id, message } = req.body;
+    const { conversation_id, repository_id, message, new_conversation } = req.body;
 
     // ── 1. Input Validation ──────────────────────────────────────────────────
     if (!repository_id || isNaN(Number(repository_id))) {
@@ -32,19 +32,23 @@ const handleChat = async (req, res, next) => {
 
     const cleanedMessage = message.trim();
     const repoIdNum = Number(repository_id);
+    const repo = await Repository.findById(repoIdNum);
+    if (!repo) {
+      const err = new Error('Repository not found');
+      err.statusCode = 404;
+      throw err;
+    }
 
-    // ── 2. Conversation & Mismatch Validation ───────────────────────────────
+    // ── 2. Conversation Resolution ───────────────────────────────────────────
     let activeConversationId;
 
-    if (conversation_id) {
-      const conv = await Conversation.findById(conversation_id);
+    if (conversation_id && !isNaN(Number(conversation_id))) {
+      const conv = await Conversation.findById(Number(conversation_id));
       if (!conv) {
         const err = new Error('Conversation not found');
         err.statusCode = 404;
         throw err;
       }
-
-      // Explicit mismatch guard: ensure conversation belongs to requested repository
       if (conv.repository_id !== repoIdNum) {
         const err = new Error(
           `conversation_id ${conversation_id} belongs to repository ${conv.repository_id}, not repository ${repoIdNum}`
@@ -52,10 +56,8 @@ const handleChat = async (req, res, next) => {
         err.statusCode = 400;
         throw err;
       }
-
       activeConversationId = conv.id;
-    } else {
-      // Auto-create conversation using the first 50 chars of the message as title
+    } else if (new_conversation) {
       const title = cleanedMessage.slice(0, 50).trim() || 'New Conversation';
       const newConv = await Conversation.create({
         userId: PLACEHOLDER_USER_ID,
@@ -63,10 +65,25 @@ const handleChat = async (req, res, next) => {
         title,
       });
       activeConversationId = newConv.id;
+    } else {
+      const recent = await Conversation.findMostRecentByUserIdAndRepositoryId(
+        PLACEHOLDER_USER_ID,
+        repoIdNum
+      );
+      if (recent) {
+        activeConversationId = recent.id;
+      } else {
+        const title = cleanedMessage.slice(0, 50).trim() || 'New Conversation';
+        const newConv = await Conversation.create({
+          userId: PLACEHOLDER_USER_ID,
+          repositoryId: repoIdNum,
+          title,
+        });
+        activeConversationId = newConv.id;
+      }
     }
 
     // ── 3. Pre-Call User Message Persistence ────────────────────────────────
-    // User message is saved before calling Python. If AI fails, the user question remains recorded.
     await Message.create({
       conversationId: activeConversationId,
       role: 'user',
@@ -86,6 +103,7 @@ const handleChat = async (req, res, next) => {
         body: JSON.stringify({
           repository_id: repoIdNum,
           message: cleanedMessage,
+          conversation_id: activeConversationId,
         }),
         signal: abortController.signal,
       });
@@ -102,7 +120,7 @@ const handleChat = async (req, res, next) => {
       clearTimeout(timeout);
     }
 
-    // ── 5. Relay Python Status & Errors Unchanged ───────────────────────────
+    // ── 5. Relay Python Status & Errors Unchanged ──────────────────────────
     if (!aiResponse.ok) {
       let errorPayload = null;
       try {
@@ -126,6 +144,7 @@ const handleChat = async (req, res, next) => {
 
     // ── 6. Save Assistant Message with Sources (Resilient) ──────────────────
     let assistantMessageId = null;
+    let persistenceWarning = false;
     try {
       const savedAssistant = await Message.create({
         conversationId: activeConversationId,
@@ -135,10 +154,15 @@ const handleChat = async (req, res, next) => {
       });
       assistantMessageId = savedAssistant?.id || null;
     } catch (dbErr) {
-      // Log persistence error server-side without failing the client request
+      persistenceWarning = true;
       console.error(
-        `[chat] Failed to persist assistant message for conversation ${activeConversationId}:`,
-        dbErr.message
+        {
+          conversation_id: activeConversationId,
+          message_length: answer.length,
+          error: dbErr.message,
+          stack: dbErr.stack,
+        },
+        '[chat] Failed to persist assistant message'
       );
     }
 
@@ -151,6 +175,7 @@ const handleChat = async (req, res, next) => {
         content: answer,
         sources,
       },
+      persistence_warning: persistenceWarning || undefined,
     });
   } catch (error) {
     next(error);

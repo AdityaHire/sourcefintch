@@ -38,7 +38,6 @@ TARGET_NODE_TYPES = {
     "class_declaration",
     "method_definition",
     "arrow_function",
-    "lexical_declaration",       # const foo = () => {} at top level
     "export_statement",          # export function/class/const
 }
 

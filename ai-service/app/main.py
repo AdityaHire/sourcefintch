@@ -44,9 +44,9 @@ async def lifespan(app: FastAPI):
     logger = logging.getLogger(__name__)
     try:
         from app.services.vector_service import ensure_collection
-        from app.services.embedding_service import get_vector_dimension
-        ensure_collection(settings.qdrant_collection_name, get_vector_dimension())
-        logger.info("Startup vector dimension check passed for collection '%s'.", settings.qdrant_collection_name)
+        from app.services.embedding_service import get_vector_dimension, get_active_collection_name
+        ensure_collection(get_active_collection_name(), get_vector_dimension())
+        logger.info("Startup vector dimension check passed for collection '%s'.", get_active_collection_name())
     except ValueError as val_err:
         logger.error("Vector dimension mismatch on startup: %s", val_err)
         raise

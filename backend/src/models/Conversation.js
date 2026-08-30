@@ -38,6 +38,17 @@ const findByRepositoryId = async (repositoryId) => {
   return rows;
 };
 
+const findMostRecentByUserIdAndRepositoryId = async (userId, repositoryId) => {
+  const sql = `
+    SELECT * FROM conversations
+    WHERE user_id = ? AND repository_id = ?
+    ORDER BY updated_at DESC
+    LIMIT 1
+  `;
+  const [rows] = await pool.execute(sql, [userId, repositoryId]);
+  return rows[0] || null;
+};
+
 // ── UPDATE ──────────────────────────────────────────────────────────────────
 
 const update = async (id, fields) => {
@@ -62,4 +73,4 @@ const remove = async (id) => {
   return result.affectedRows > 0;
 };
 
-module.exports = { create, findById, findByUserId, findByRepositoryId, update, remove };
+module.exports = { create, findById, findByUserId, findByRepositoryId, findMostRecentByUserIdAndRepositoryId, update, remove };

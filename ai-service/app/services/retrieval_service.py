@@ -12,7 +12,7 @@ import logging
 from typing import Optional
 
 from app.config import settings
-from app.services.embedding_service import embed_texts
+from app.services.embedding_service import embed_texts, get_active_collection_name
 from app.services.vector_service import search_points
 
 logger = logging.getLogger(__name__)
@@ -53,7 +53,7 @@ def retrieve_relevant_chunks(
 
     # 2. Search Qdrant filtered by repository_id
     raw_results = search_points(
-        collection_name=settings.qdrant_collection_name,
+        collection_name=get_active_collection_name(),
         query_vector=query_vector,
         limit=limit,
         repository_id=repository_id,

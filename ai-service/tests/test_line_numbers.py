@@ -213,3 +213,136 @@ def test_generic_parser_regex_boundaries():
     assert foo_chunks[0].start_line == 4
     # bar starts at line 7 (1-indexed)
     assert bar_chunks[0].start_line == 7
+
+
+# ── Test 7: JS parser — standalone declarations are NOT extracted ──────
+
+def test_js_parser_skips_standalone_declarations():
+    """Standalone let/const declarations must NOT be extracted as individual
+    chunks.  Only functions, classes, methods, arrow functions, and exports
+    should become chunks.
+
+    This guards against the bug where files like script.js returned only
+    isolated variable declarations (textIndex, isDeleting, body, tabPanes,
+    observerOptions) with no surrounding function logic.
+    """
+
+    source = (
+        "// script.js\n"
+        "let textIndex = 0;\n"           # line 2 — should NOT be a chunk
+        "const isDeleting = false;\n"    # line 3 — should NOT be a chunk
+        "const body = document.body;\n"  # line 4 — should NOT be a chunk
+        "const tabPanes = [];\n"         # line 5 — should NOT be a chunk
+        "const observerOptions = {};\n"  # line 6 — should NOT be a chunk
+        "\n"
+        "function init() {\n"            # line 8 — SHOULD be a chunk
+        "  textIndex = 0;\n"
+        "  return body;\n"
+        "}\n"                            # line 11
+        "\n"
+        "const refresh = () => {\n"      # line 13 — SHOULD be a chunk
+        "  init();\n"
+        "};\n"                            # line 15
+    )
+
+    parser = JavaScriptParser()
+    chunks = parser.parse("script.js", "javascript", source)
+
+    # No declaration-only chunks (simple let/const without function logic)
+    for chunk in chunks:
+        stripped = chunk.content.strip()
+        is_simple_declaration = (
+            stripped.startswith("let ") or
+            (stripped.startswith("const ") and "=>" not in stripped and "function" not in stripped)
+        )
+        assert not is_simple_declaration, (
+            f"Unexpected simple declaration chunk: {chunk.content!r}"
+        )
+
+    # Must find the init function
+    init_chunks = [c for c in chunks if "function init" in c.content]
+    assert len(init_chunks) == 1, "Expected 1 init function chunk"
+    assert init_chunks[0].start_line == 8
+    assert init_chunks[0].end_line == 11
+
+    # Must find the refresh arrow function
+    refresh_chunks = [c for c in chunks if "const refresh" in c.content]
+    assert len(refresh_chunks) == 1, "Expected 1 refresh arrow-function chunk"
+    assert refresh_chunks[0].start_line == 13
+    assert refresh_chunks[0].end_line == 15
+
+
+# ── Test 8: JS parser — declarations-only file returns whole file ──────
+
+def test_js_parser_declarations_only_returns_whole_file():
+    """When a file contains only let/const declarations and no functions,
+    classes, or arrow functions, the parser must return the entire file
+    as a single chunk rather than producing empty results.
+    """
+
+    source = (
+        "// settings.js\n"
+        "const API_URL = 'https://api.example.com';\n"
+        "const TIMEOUT = 5000;\n"
+        "const DEBUG = true;\n"
+    )
+
+    parser = JavaScriptParser()
+    chunks = parser.parse("settings.js", "javascript", source)
+
+    assert len(chunks) == 1, f"Expected 1 whole-file chunk, got {len(chunks)}"
+    assert chunks[0].start_line == 1
+    assert chunks[0].end_line == 4
+    assert chunks[0].parser_used == "tree-sitter-javascript"
+
+
+# ── Test 9: TS parser — standalone declarations skipped, functions kept ─
+
+def test_ts_parser_skips_standalone_declarations():
+    """TypeScript files must behave the same as JavaScript: standalone
+    declarations are skipped, functions are extracted.
+    """
+
+    source = (
+        "// greeter.ts\n"
+        "let prefix = 'Hello';\n"
+        "\n"
+        "function greet(name: string): string {\n"
+        "  return `${prefix}, ${name}!`;\n"
+        "}\n"
+    )
+
+    parser = JavaScriptParser()
+    chunks = parser.parse("greeter.ts", "typescript", source)
+
+    # No declaration-only chunks
+    for chunk in chunks:
+        assert not chunk.content.strip().startswith("let "), (
+            f"Unexpected let-declaration chunk in TS: {chunk.content!r}"
+        )
+
+    # Must find the greet function
+    greet_chunks = [c for c in chunks if "function greet" in c.content]
+    assert len(greet_chunks) == 1
+    assert greet_chunks[0].start_line == 4
+    assert greet_chunks[0].parser_used == "tree-sitter-typescript"
+
+
+# ── Test 10: JS parser — export statement still extracted ──────────────
+
+def test_js_parser_export_statement_extracted():
+    """export statements must still be extracted as individual chunks."""
+
+    source = (
+        "function helper() {}\n"
+        "\n"
+        "export { helper };\n"
+    )
+
+    parser = JavaScriptParser()
+    chunks = parser.parse("module.js", "javascript", source)
+
+    export_chunks = [c for c in chunks if "export" in c.content]
+    assert len(export_chunks) == 1, "Expected 1 export chunk"
+    assert export_chunks[0].start_line == 3
+    assert export_chunks[0].end_line == 3

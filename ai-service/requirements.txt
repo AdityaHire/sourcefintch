@@ -10,3 +10,4 @@ tree-sitter-typescript==0.23.2
 pytest==8.4.2
 sentence-transformers>=3.0.0
 qdrant-client>=1.11.0
+google-genai>=1.0.0

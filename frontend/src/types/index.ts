@@ -72,4 +72,5 @@ export interface ChatResponse {
     content: string;
     sources: SourceCitation[];
   };
+  persistence_warning?: boolean;
 }

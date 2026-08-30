@@ -134,6 +134,7 @@ export async function sendChatMessage(payload: {
   conversation_id?: number;
   repository_id: number;
   message: string;
+  new_conversation?: boolean;
 }): Promise<ChatResponse> {
   const res = await fetch('/api/chat', {
     method: 'POST',

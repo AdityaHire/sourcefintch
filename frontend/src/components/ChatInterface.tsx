@@ -36,6 +36,7 @@ export default function ChatInterface() {
   const [isLoadingConv, setIsLoadingConv] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [persistenceWarning, setPersistenceWarning] = useState(false);
   const [selectedCitation, setSelectedCitation] = useState<SourceCitation | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isCodeViewerOpen, setIsCodeViewerOpen] = useState(false);
@@ -137,7 +138,10 @@ export default function ChatInterface() {
   };
 
   // ── New Chat in current repository ────────────────────────────────────────
-  const handleNewChat = () => {
+  const handleNewChat = async () => {
+    if (!selectedRepoId) return;
+
+    setPersistenceWarning(false);
     setConversationId(null);
     setMessages([]);
     setSelectedCitation(null);
@@ -147,6 +151,16 @@ export default function ChatInterface() {
     const url = new URL(window.location.href);
     url.searchParams.delete('conversationId');
     window.history.pushState(null, '', url.pathname + url.search);
+
+    try {
+      const newConv = await createConversation(selectedRepoId);
+      setConversationId(newConv.id);
+      const url = new URL(window.location.href);
+      url.searchParams.set('conversationId', String(newConv.id));
+      window.history.pushState(null, '', url.pathname + url.search);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to create new conversation');
+    }
 
     textareaRef.current?.focus();
   };
@@ -196,6 +210,7 @@ export default function ChatInterface() {
         conversation_id: conversationId || undefined,
         repository_id: selectedRepoId,
         message: userText,
+        new_conversation: !conversationId,
       });
 
       if (!conversationId && response.conversation_id) {
@@ -203,6 +218,12 @@ export default function ChatInterface() {
         const url = new URL(window.location.href);
         url.searchParams.set('conversationId', String(response.conversation_id));
         window.history.pushState(null, '', url.pathname + url.search);
+      }
+
+      if (response.persistence_warning) {
+        setPersistenceWarning(true);
+      } else {
+        setPersistenceWarning(false);
       }
 
       const assistantMsg: ChatMessage = {
@@ -380,6 +401,20 @@ export default function ChatInterface() {
               type="button"
               onClick={() => setErrorMessage(null)}
               className="text-rose-500 hover:text-rose-700 dark:hover:text-rose-100 cursor-pointer ml-3 font-semibold"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        {/* Persistence Warning Banner */}
+        {persistenceWarning && (
+          <div className="flex items-center justify-between border-b border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/[0.06] px-4 sm:px-6 py-2.5 text-xs text-amber-900 dark:text-amber-200 shrink-0 font-sans-ui">
+            <span>Response shown, but could not be saved to history due to a storage issue.</span>
+            <button
+              type="button"
+              onClick={() => setPersistenceWarning(false)}
+              className="text-amber-500 hover:text-amber-700 dark:hover:text-amber-100 cursor-pointer ml-3 font-semibold"
             >
               Dismiss
             </button>

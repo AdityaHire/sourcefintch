@@ -7,13 +7,15 @@ Coordinates:
    - Repository does not exist → HTTP 404
    - Repository still mid-indexing (pending, cloning, scanning, storing, embedding) → HTTP 409
    - Repository indexing failed → HTTP 422
-2. Vector retrieval from Qdrant via retrieval_service with RAG_MIN_SCORE filtering.
-3. Zero-evidence short-circuit (returns exact spec fallback with sources: [] without calling LLM).
-4. Total context-size cap (RAG_MAX_CONTEXT_CHARS) with priority-based chunk dropping.
-5. System prompt construction adhering strictly to Spec §35 hallucination-control rules.
-6. LLM answer generation and traceable sources response formatting.
+2. Query rewriting using conversation history via Groq (llama-3.1-8b-instant).
+3. Vector retrieval from Qdrant via retrieval_service with RAG_MIN_SCORE filtering.
+4. Zero-evidence short-circuit (returns exact spec fallback with sources: [] without calling LLM).
+5. Total context-size cap (RAG_MAX_CONTEXT_CHARS) with priority-based chunk dropping.
+6. System prompt construction adhering strictly to Spec §35 hallucination-control rules.
+7. LLM answer generation and traceable sources response formatting.
 """
 
+import json
 import logging
 from typing import Optional
 
@@ -41,6 +43,16 @@ STRICT RULES:
 5. Distinguish Facts from Assumptions: Clearly separate direct facts found in the code from assumptions.
 6. Security: Never expose or suggest committing secrets, API keys, or credentials.
 7. Technical Precision: Keep explanations clear, structured, accurate, and concise."""
+
+QUERY_REWRITE_MODEL = "llama-3.1-8b-instant"
+QUERY_REWRITE_URL = "https://api.groq.com/openai/v1/chat/completions"
+QUERY_REWRITE_SYSTEM = (
+    "You are a query rewriting assistant for a code-search RAG system. "
+    "Given a conversation history and a new user question, rewrite the new question into a "
+    "single, standalone, fully self-contained search query. Resolve pronouns and references "
+    "(e.g. 'it', 'that function', 'this file') using the conversation context. Do not answer the question. "
+    "Output only the rewritten query."
+)
 
 
 async def get_repository_info(repository_id: int) -> dict:
@@ -116,7 +128,46 @@ def apply_context_cap(chunks: list[dict], max_chars: int) -> tuple[list[dict], i
     return retained, dropped
 
 
-async def answer_question(repository_id: int, question: str) -> dict:
+async def rewrite_query(question: str, conversation_history: Optional[list]) -> str:
+    """Rewrite a user question into a standalone search query using Groq.
+
+    If no history is provided or the Groq call fails, returns the original
+    question unchanged so retrieval still works.
+    """
+    if not settings.effective_groq_api_key:
+        return question
+
+    history_block = ""
+    if conversation_history:
+        recent = conversation_history[-6:]
+        history_block = "\n".join(
+            f"{h.get('role', 'user')}: {h.get('content', '')}" for h in recent if isinstance(h, dict)
+        )
+
+    if not history_block:
+        return question
+
+    user_content = (
+        f"Conversation history:\n{history_block}\n\n"
+        f"New question:\n{question}\n\n"
+        f"Rewritten standalone query:"
+    )
+
+    try:
+        llm = get_llm_provider()
+        rewritten = await llm.generate_answer(
+            system_prompt=QUERY_REWRITE_SYSTEM,
+            user_prompt=user_content,
+        )
+        if rewritten:
+            return rewritten
+        return question
+    except Exception as exc:
+        logger.warning("Query rewrite failed; using original question: %s", exc)
+        return question
+
+
+async def answer_question(repository_id: int, question: str, conversation_history: Optional[list] = None) -> dict:
     """Execute the full RAG pipeline for a user question.
 
     Returns:
@@ -140,22 +191,18 @@ async def answer_question(repository_id: int, question: str) -> dict:
             detail=f"Repository {repository_id} indexing failed and cannot be queried.",
         )
 
-    # ── Step 2: Retrieve relevant chunks from Qdrant ─────────────────
-    # NOTE ON MULTI-TURN CONTEXT LIMITATION:
-    # Each question is currently embedded and retrieved independently of prior
-    # conversation turns. Follow-up questions that rely on pronouns or context
-    # from earlier in the conversation (e.g. "how do I run it?") may retrieve poorly
-    # or trigger the zero-evidence fallback, since "it" has no resolvable meaning
-    # at embedding time. Multi-turn context injection is tracked as future work,
-    # not handled in Phase 7.
+    # ── Step 2: Rewrite query using conversation history ──────────────
+    retrieval_query = await rewrite_query(question, conversation_history)
+
+    # ── Step 3: Retrieve relevant chunks from Qdrant ─────────────────
     candidate_chunks = retrieve_relevant_chunks(
         repository_id=repository_id,
-        query=question,
+        query=retrieval_query,
         top_k=settings.rag_top_k,
         min_score=settings.rag_min_score,
     )
 
-    # ── Step 3: Zero-evidence short-circuit ──────────────────────────
+    # ── Step 4: Zero-evidence short-circuit ──────────────────────────
     if not candidate_chunks:
         logger.info(
             "No chunks met similarity threshold (min_score=%.2f) for repo %d. Short-circuiting LLM call.",
@@ -167,7 +214,7 @@ async def answer_question(repository_id: int, question: str) -> dict:
             "sources": [],
         }
 
-    # ── Step 4: Apply context-size cap ───────────────────────────────
+    # ── Step 5: Apply context-size cap ───────────────────────────────
     retained_chunks, dropped_count = apply_context_cap(
         candidate_chunks,
         max_chars=settings.rag_max_context_chars,
@@ -179,11 +226,11 @@ async def answer_question(repository_id: int, question: str) -> dict:
             settings.rag_max_context_chars,
         )
 
-    # ── Step 5: Format prompts ───────────────────────────────────────
+    # ── Step 6: Format prompts ───────────────────────────────────────
     user_prompt = build_user_prompt(question, retained_chunks)
     logger.debug("Prompt constructed for repo %d:\nSystem: %s\nUser: %s", repository_id, SYSTEM_PROMPT, user_prompt[:200])
 
-    # ── Step 6: Call LLM Provider ────────────────────────────────────
+    # ── Step 7: Call LLM Provider ────────────────────────────────────
     llm_provider = get_llm_provider()
     logger.info("Calling LLM provider '%s' for repository %d...", settings.llm_provider, repository_id)
     answer_text = await llm_provider.generate_answer(
@@ -191,7 +238,7 @@ async def answer_question(repository_id: int, question: str) -> dict:
         user_prompt=user_prompt,
     )
 
-    # ── Step 7: Build traceable sources array ────────────────────────
+    # ── Step 8: Build traceable sources array ────────────────────────
     sources = [
         {
             "file_path": c["file_path"],

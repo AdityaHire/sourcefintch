@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     embedding_provider: str = "local"
     embedding_model: str = "all-MiniLM-L6-v2"
     embedding_api_key: str = ""
+    # Gemini embedding provider (optional alternative to local)
+    gemini_api_key: str = ""
+    gemini_embedding_model: str = "gemini-embedding-001"
+    # MRL truncation target for gemini-embedding-001 (native dim is 3072).
+    # Keep this consistent per-provider so Qdrant collection dimensions match.
+    gemini_embedding_dimension: int = 768
 
     # ── Qdrant Vector DB ────────────────────────────
     qdrant_url: str = "http://localhost:6333"
