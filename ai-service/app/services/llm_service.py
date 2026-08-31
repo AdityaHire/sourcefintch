@@ -66,6 +66,7 @@ class GroqProvider:
                 {"role": "user", "content": user_prompt},
             ],
             "temperature": 0.1,
+            "max_tokens": 8192,
         }
 
         try:
@@ -81,7 +82,19 @@ class GroqProvider:
                     data.get("usage", {}).get("prompt_tokens"),
                     data.get("usage", {}).get("completion_tokens"),
                 )
-                content = data["choices"][0]["message"]["content"]
+                logger.debug("Groq raw response JSON: %s", data)
+                choice = data.get("choices", [{}])[0] if data.get("choices") else {}
+                finish_reason = choice.get("finish_reason", "unknown")
+                content = choice.get("message", {}).get("content")
+                logger.info(
+                    "Groq completion | finish_reason=%s | content_length=%d | content_preview=%r",
+                    finish_reason,
+                    len(content) if content is not None else -1,
+                    (content or "")[:200],
+                )
+                if content is None:
+                    logger.error("Groq returned null/empty content. Full response: %s", data)
+                    return ""
                 return content.strip()
         except httpx.TimeoutException as exc:
             logger.error("Groq API call timed out after %ss: %s", self.timeout_seconds, exc)

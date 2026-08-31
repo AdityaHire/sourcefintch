@@ -215,6 +215,15 @@ async def answer_question(repository_id: int, question: str, conversation_histor
         }
 
     # ── Step 5: Apply context-size cap ───────────────────────────────
+    context_len = sum(len(c.get("content", "")) for c in candidate_chunks)
+    logger.info(
+        "Context size for repo %d query '%s': %d chars (cap=%d, chunks=%d)",
+        repository_id,
+        retrieval_query[:50],
+        context_len,
+        settings.rag_max_context_chars,
+        len(candidate_chunks),
+    )
     retained_chunks, dropped_count = apply_context_cap(
         candidate_chunks,
         max_chars=settings.rag_max_context_chars,
@@ -226,30 +235,84 @@ async def answer_question(repository_id: int, question: str, conversation_histor
             settings.rag_max_context_chars,
         )
 
+    retained_context_len = sum(len(c.get("content", "")) for c in retained_chunks)
+    logger.info(
+        "Retained context for repo %d: %d chars from %d chunks (top score=%.4f, min retained score=%.4f)",
+        repository_id,
+        retained_context_len,
+        len(retained_chunks),
+        retained_chunks[0].get("score", 0.0) if retained_chunks else 0.0,
+        retained_chunks[-1].get("score", 0.0) if retained_chunks else 0.0,
+    )
+
     # ── Step 6: Format prompts ───────────────────────────────────────
     user_prompt = build_user_prompt(question, retained_chunks)
     logger.debug("Prompt constructed for repo %d:\nSystem: %s\nUser: %s", repository_id, SYSTEM_PROMPT, user_prompt[:200])
 
-    # ── Step 7: Call LLM Provider ────────────────────────────────────
+    # ── Step 7: Call LLM Provider (with empty-answer retry) ──────────
     llm_provider = get_llm_provider()
     logger.info("Calling LLM provider '%s' for repository %d...", settings.llm_provider, repository_id)
-    answer_text = await llm_provider.generate_answer(
-        system_prompt=SYSTEM_PROMPT,
-        user_prompt=user_prompt,
+
+    def _build_sources(chunks):
+        return [
+            {
+                "file_path": c["file_path"],
+                "start_line": c["start_line"],
+                "end_line": c["end_line"],
+                "code_chunk_id": c.get("code_chunk_id"),
+                "score": round(float(c.get("score", 0.0)), 4),
+                "content": c.get("content", ""),
+            }
+            for c in chunks
+        ]
+
+    def _call_llm(chunks):
+        prompt = build_user_prompt(question, chunks)
+        return llm_provider.generate_answer(
+            system_prompt=SYSTEM_PROMPT,
+            user_prompt=prompt,
+        )
+
+    answer_text = await _call_llm(retained_chunks)
+    logger.info(
+        "LLM returned answer for repo %d: length=%d, empty=%s",
+        repository_id,
+        len(answer_text),
+        not bool(answer_text.strip()),
     )
 
-    # ── Step 8: Build traceable sources array ────────────────────────
-    sources = [
-        {
-            "file_path": c["file_path"],
-            "start_line": c["start_line"],
-            "end_line": c["end_line"],
-            "code_chunk_id": c.get("code_chunk_id"),
-            "score": round(float(c.get("score", 0.0)), 4),
-            "content": c.get("content", ""),
+    # Retry once with fewer chunks if the model returned an empty response
+    # (common with `finish_reason=length` on smaller context windows).
+    if not answer_text or not answer_text.strip():
+        logger.warning(
+            "LLM returned empty answer for repo %d (query='%s'). Retrying with fewer chunks...",
+            repository_id,
+            retrieval_query[:80],
+        )
+        reduced_chunks = retained_chunks[: max(1, len(retained_chunks) // 2)]
+        answer_text = await _call_llm(reduced_chunks)
+        logger.info(
+            "LLM retry for repo %d: length=%d, empty=%s",
+            repository_id,
+            len(answer_text),
+            not bool(answer_text.strip()),
+        )
+        if answer_text and answer_text.strip():
+            retained_chunks = reduced_chunks
+
+    if not answer_text or not answer_text.strip():
+        logger.warning(
+            "LLM retry also returned empty answer for repo %d (query='%s'). Returning fallback.",
+            repository_id,
+            retrieval_query[:80],
+        )
+        return {
+            "answer": FALLBACK_NO_EVIDENCE,
+            "sources": _build_sources(retained_chunks),
         }
-        for c in retained_chunks
-    ]
+
+    # ── Step 8: Build traceable sources array ────────────────────────
+    sources = _build_sources(retained_chunks)
 
     return {
         "answer": answer_text,

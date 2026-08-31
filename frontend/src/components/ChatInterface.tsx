@@ -502,10 +502,16 @@ export default function ChatInterface() {
                           {msg.content}
                         </div>
                       </div>
-                    ) : (
+                     ) : (
                       /* Assistant message: structured document format */
                       <div className="flex flex-col items-start w-full">
-                        <MarkdownRenderer content={msg.content} onOpenCode={handleOpenCode} />
+                        {msg.content ? (
+                          <MarkdownRenderer content={msg.content} onOpenCode={handleOpenCode} />
+                        ) : (
+                          <div className="max-w-[72ch] rounded-xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/[0.06] px-4 py-3 text-xs text-amber-900 dark:text-amber-200 font-sans-ui">
+                            No answer was generated for this question. The LLM returned an empty response — this can happen with very short queries or if the model truncated its output. Try rephrasing your question.
+                          </div>
+                        )}
 
                         {/* ── CITED SOURCES · Prominent Interactive Table ── */}
                         {msg.sources && msg.sources.length > 0 && (

@@ -68,7 +68,7 @@ AMBIGUOUS_CLARIFY = (
 
 # ── Classification prompt (compact Groq call) ─────────────────────────────────
 
-_CLASSIFY_MODEL = "llama-3.1-8b-instant"
+_CLASSIFY_MODEL = settings.llm_model
 _CLASSIFY_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 _CLASSIFY_SYSTEM = """You are the message router for Sourcefinch, an AI codebase assistant.
