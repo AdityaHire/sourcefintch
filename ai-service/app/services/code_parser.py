@@ -43,6 +43,12 @@ from qdrant_client import models
 from app.config import settings
 from app.services.chunking_service import chunk_file
 from app.services.embedding_service import embed_texts, get_vector_dimension, get_active_collection_name
+from app.services.node_internal_client import (
+    async_internal_delete,
+    async_internal_patch,
+    async_internal_post,
+    async_internal_get,
+)
 from app.services.vector_service import (
     delete_by_repository_id,
     ensure_collection,
@@ -79,8 +85,7 @@ async def fetch_file_list(repository_id: int) -> list[dict]:
     url = f"{settings.node_api_url}/api/repositories/{repository_id}/files"
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(url)
+        response = await async_internal_get(url)
     except (httpx.ConnectError, httpx.TimeoutException) as exc:
         logger.error("Failed to reach Node API at %s: %s", url, exc)
         raise HTTPException(
@@ -112,8 +117,7 @@ async def update_repository_status(repository_id: int, status: str) -> None:
     url = f"{settings.node_api_url}/api/repositories/{repository_id}/status"
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.patch(url, json={"status": status})
+        response = await async_internal_patch(url, json={"status": status})
     except (httpx.ConnectError, httpx.TimeoutException) as exc:
         logger.error("Failed to reach Node API to update status for repo %d: %s", repository_id, exc)
         raise HTTPException(
@@ -139,8 +143,7 @@ async def delete_repository_chunks(repository_id: int) -> None:
     url = f"{settings.node_api_url}/api/repositories/{repository_id}/chunks"
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.delete(url)
+        response = await async_internal_delete(url)
     except (httpx.ConnectError, httpx.TimeoutException) as exc:
         logger.error("Failed to reach Node API to delete chunks for repo %d: %s", repository_id, exc)
         raise HTTPException(
@@ -173,8 +176,7 @@ async def insert_chunks_batch(chunks: list[dict]) -> list[dict]:
     url = f"{settings.node_api_url}/api/chunks/batch"
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(url, json={"chunks": chunks})
+        response = await async_internal_post(url, json={"chunks": chunks})
     except (httpx.ConnectError, httpx.TimeoutException) as exc:
         logger.error("Failed to reach Node API to batch-insert chunks: %s", exc)
         raise HTTPException(

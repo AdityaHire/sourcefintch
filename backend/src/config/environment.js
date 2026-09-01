@@ -42,6 +42,17 @@ const config = {
 
   // ── AI Service ────────────────────────────────────
   aiServiceUrl: process.env.AI_SERVICE_URL || 'http://localhost:8000',
+
+  // ── Clerk Authentication ──────────────────────────
+  clerk: {
+    secretKey: process.env.CLERK_SECRET_KEY || '',
+    publishableKey: process.env.CLERK_PUBLISHABLE_KEY || '',
+  },
+
+  // ── Internal API Secret ───────────────────────────
+  // Shared with the Python AI service for server-to-server calls.
+  // Must match INTERNAL_API_SECRET in ai-service/.env.
+  internalApiSecret: process.env.INTERNAL_API_SECRET || '',
 };
 
 module.exports = config;

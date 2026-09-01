@@ -1,8 +1,15 @@
 /**
- * Conversation routes — maps endpoints for conversation management.
+ * Conversation routes — frontend-only.
+ *
+ * /api/conversations/:id is called by BOTH the frontend AND the AI service
+ * (the AI fetches conversation history). It uses requireAuthOrInternal.
+ *
+ * The list/create endpoints stay requireAuth.
  */
 
 const { Router } = require('express');
+const requireAuth = require('../middleware/requireAuth');
+const requireAuthOrInternal = require('../middleware/requireAuthOrInternal');
 const {
   createConversation,
   getConversation,
@@ -11,13 +18,10 @@ const {
 
 const router = Router();
 
-// GET /api/conversations
-router.get('/', listConversations);
+router.get('/', requireAuth, listConversations);
+router.post('/', requireAuth, createConversation);
 
-// POST /api/conversations
-router.post('/', createConversation);
-
-// GET /api/conversations/:id
-router.get('/:id', getConversation);
+// AI service fetches history with x-internal-secret; users fetch with session token.
+router.get('/:id', requireAuthOrInternal, getConversation);
 
 module.exports = router;

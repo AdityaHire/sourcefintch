@@ -19,8 +19,12 @@ const config = require('./config/environment');
 const routes = require('./routes');
 const notFound = require('./middleware/notFound');
 const errorHandler = require('./middleware/errorHandler');
+const clerkAuth = require('./middleware/clerkMiddleware');
 
 const app = express();
+
+// ── 0. Clerk (must come BEFORE routes so req.auth is populated) ────────
+app.use(clerkAuth);
 
 // ── 1. Body parsing ────────────────────────────────
 app.use(express.json());

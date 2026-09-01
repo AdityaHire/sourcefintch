@@ -1,23 +1,22 @@
 /**
  * Conversation controller — manages chat threads and message retrieval.
  *
- * POST /api/conversations      — create a new conversation thread
- * GET  /api/conversations/:id  — fetch conversation metadata and full message history
- * GET  /api/conversations      — list conversations (optionally filtered by repository_id)
+ * Auth source: req.auth.userId (Clerk) set by requireAuth middleware.
+ * The GET /:id endpoint is dual-mode and skips ownership enforcement for
+ * internal AI-service calls (req.auth?.userId absent).
  */
 
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const Repository = require('../models/Repository');
+const { getAuth } = require('@clerk/express');
 
-const PLACEHOLDER_USER_ID = 1;
+const userId = (req) => getAuth(req)?.userId ?? null;
 
-/**
- * Explicit conversation creation (e.g. user clicks "New Chat" in UI).
- */
 const createConversation = async (req, res, next) => {
   try {
     const { repository_id, title } = req.body;
+    const currentUserId = userId(req);
 
     if (!repository_id || isNaN(Number(repository_id))) {
       const err = new Error('repository_id is required');
@@ -26,16 +25,20 @@ const createConversation = async (req, res, next) => {
     }
 
     const repo = await Repository.findById(repository_id);
-    if (!repo) {
+    if (!repo || repo.user_id !== currentUserId) {
+      // Return 404 on missing OR not-owned to avoid leaking existence
       const err = new Error('Repository not found');
       err.statusCode = 404;
       throw err;
     }
 
     const conversation = await Conversation.create({
-      userId: PLACEHOLDER_USER_ID,
+      userId: currentUserId,
       repositoryId: Number(repository_id),
-      title: title && typeof title === 'string' && title.trim() ? title.trim() : 'New Conversation',
+      title:
+        title && typeof title === 'string' && title.trim()
+          ? title.trim()
+          : 'New Conversation',
     });
 
     res.status(201).json(conversation);
@@ -44,15 +47,20 @@ const createConversation = async (req, res, next) => {
   }
 };
 
-/**
- * Fetch a conversation by ID along with its chronological message history.
- */
 const getConversation = async (req, res, next) => {
   try {
     const { id } = req.params;
     const conversation = await Conversation.findById(id);
 
     if (!conversation) {
+      const err = new Error('Conversation not found');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    // Ownership check for authenticated callers only.
+    const currentUserId = userId(req);
+    if (currentUserId && conversation.user_id !== currentUserId) {
       const err = new Error('Conversation not found');
       err.statusCode = 404;
       throw err;
@@ -69,18 +77,17 @@ const getConversation = async (req, res, next) => {
   }
 };
 
-/**
- * List conversations for the current user, optionally filtered by repository_id.
- */
 const listConversations = async (req, res, next) => {
   try {
     const { repository_id } = req.query;
+    const currentUserId = userId(req);
     let conversations;
 
     if (repository_id) {
-      conversations = await Conversation.findByRepositoryId(repository_id);
+      const allForRepo = await Conversation.findByRepositoryId(repository_id);
+      conversations = allForRepo.filter((c) => c.user_id === currentUserId);
     } else {
-      conversations = await Conversation.findByUserId(PLACEHOLDER_USER_ID);
+      conversations = await Conversation.findByUserId(currentUserId);
     }
 
     res.json(conversations);

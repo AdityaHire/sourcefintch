@@ -62,20 +62,27 @@ const recordMigration = async (filename) => {
 
 /**
  * Parse a .sql file into executable statements.
- * Splits on semicolons, trims whitespace, and filters out empty
- * strings and comment-only blocks.
+ * Splits on semicolons, strips `--` line comments, trims whitespace,
+ * and filters out empty / comment-only blocks.
  */
 const parseStatements = (sql) => {
-  return sql
+  // Remove all full-line `--` comments first so header blocks don't leak
+  // prose lines (like "`files.content` is ...") into the first statement.
+  const stripped = sql
+    .split('\n')
+    .map((line) => {
+      const idx = line.indexOf('--');
+      // Only treat `--` as a comment if it starts at the beginning of the
+      // line (after optional whitespace) — leaves SQL like `WHERE a--1` alone.
+      const leading = line.trimStart();
+      return leading.startsWith('--') ? '' : line;
+    })
+    .join('\n');
+
+  return stripped
     .split(';')
     .map((s) => s.trim())
-    .filter((s) => s.length > 0)
-    .filter((s) => {
-      // Skip blocks that are entirely comments or blank lines
-      return !s.split('\n').every(
-        (line) => line.trim().startsWith('--') || line.trim() === ''
-      );
-    });
+    .filter((s) => s.length > 0);
 };
 
 const runMigrations = async () => {

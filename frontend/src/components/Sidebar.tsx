@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { Repository } from '../types';
-import { createRepository, getRepository, deleteRepository } from '../services/api';
+import { useApiClient } from '../services/useApiClient';
 import { RepoIngestionLoader } from '@/components/ui/repo-ingestion-loader';
 import {
   Plus,
@@ -36,6 +36,7 @@ export default function Sidebar({
   isOpenMobile = false,
   onCloseMobile,
 }: SidebarProps) {
+  const api = useApiClient();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -80,7 +81,7 @@ export default function Sidebar({
     setIndexingStatus('Initiating ingestion pipeline...');
 
     try {
-      const initResult = await createRepository(githubUrl.trim(), branch.trim() || undefined);
+      const initResult = await api.createRepository(githubUrl.trim(), branch.trim() || undefined);
       const repoId = initResult.id;
       setIndexingStatus(`Indexing started (ID: ${repoId}). Ingesting & embedding code chunks...`);
 
@@ -89,7 +90,7 @@ export default function Sidebar({
       const pollInterval = setInterval(async () => {
         attempts++;
         try {
-          const repo = await getRepository(repoId);
+          const repo = await api.getRepository(repoId);
           setIndexingStatus(`Current status: ${repo.status} (${repo.file_count || 0} files)`);
 
           if (repo.status === 'completed') {
@@ -128,7 +129,7 @@ export default function Sidebar({
     setDeleteError(null);
 
     try {
-      await deleteRepository(repoToDelete.id);
+      await api.deleteRepository(repoToDelete.id);
       if (onRepoDeleted) {
         onRepoDeleted(repoToDelete.id);
       }

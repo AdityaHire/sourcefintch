@@ -51,6 +51,8 @@ class Settings(BaseSettings):
 
     # ── Node API ────────────────────────────────────
     node_api_url: str = "http://localhost:3001"
+    # Shared secret for server-to-server calls — must match backend INTERNAL_API_SECRET.
+    internal_api_secret: str = ""
 
     # ── Clone settings ──────────────────────────────
     clone_timeout_seconds: int = 120

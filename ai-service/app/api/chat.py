@@ -15,6 +15,7 @@ from fastapi import APIRouter, HTTPException
 from app.config import settings
 from app.schemas.chat import ChatRequest, ChatResponse, SourceCitation
 from app.services.message_router import route_message
+from app.services.node_internal_client import async_internal_get
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ai", tags=["chat"])
@@ -65,8 +66,7 @@ async def _fetch_conversation_history(conversation_id: int) -> Optional[list]:
     url = f"{settings.node_api_url}/api/conversations/{conversation_id}"
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(url)
+        response = await async_internal_get(url)
     except (httpx.ConnectError, httpx.TimeoutException, httpx.RequestError) as exc:
         logger.warning("Failed to reach Node backend for conversation history: %s", exc)
         return None

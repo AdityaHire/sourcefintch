@@ -7,6 +7,7 @@
  */
 
 const { pool } = require('../config/database');
+const { sqlParams } = require('../utils/sqlParams');
 
 // ── CREATE ──────────────────────────────────────────────────────────────────
 
@@ -15,7 +16,10 @@ const create = async ({ userId, name, owner, githubUrl, branch = 'main' }) => {
     INSERT INTO repositories (user_id, name, owner, github_url, branch)
     VALUES (?, ?, ?, ?, ?)
   `;
-  const [result] = await pool.execute(sql, [userId, name, owner, githubUrl, branch]);
+  const [result] = await pool.execute(
+    sql,
+    sqlParams([userId, name, owner, githubUrl, branch])
+  );
   return findById(result.insertId);
 };
 
@@ -23,24 +27,35 @@ const create = async ({ userId, name, owner, githubUrl, branch = 'main' }) => {
 
 const findById = async (id) => {
   const sql = 'SELECT * FROM repositories WHERE id = ?';
-  const [rows] = await pool.execute(sql, [id]);
+  const [rows] = await pool.execute(sql, sqlParams([id]));
   return rows[0] || null;
 };
 
 const findByUserId = async (userId) => {
   const sql = 'SELECT * FROM repositories WHERE user_id = ? ORDER BY created_at DESC';
-  const [rows] = await pool.execute(sql, [userId]);
+  const [rows] = await pool.execute(sql, sqlParams([userId]));
   return rows;
 };
 
 const findCompleted = async () => {
   const sql = `
-    SELECT id, name, owner, github_url, branch, file_count, status, created_at
+    SELECT id, user_id, name, owner, github_url, branch, file_count, status, created_at
     FROM repositories
     WHERE status = 'completed'
     ORDER BY created_at DESC
   `;
   const [rows] = await pool.execute(sql);
+  return rows;
+};
+
+const findCompletedByUserId = async (userId) => {
+  const sql = `
+    SELECT id, user_id, name, owner, github_url, branch, file_count, status, created_at
+    FROM repositories
+    WHERE user_id = ? AND status = 'completed'
+    ORDER BY created_at DESC
+  `;
+  const [rows] = await pool.execute(sql, sqlParams([userId]));
   return rows;
 };
 
@@ -50,7 +65,7 @@ const findActiveByUserId = async (userId) => {
     WHERE user_id = ? AND status IN ('pending', 'cloning', 'scanning', 'storing', 'embedding')
     ORDER BY created_at DESC
   `;
-  const [rows] = await pool.execute(sql, [userId]);
+  const [rows] = await pool.execute(sql, sqlParams([userId]));
   return rows;
 };
 
@@ -66,7 +81,7 @@ const update = async (id, fields) => {
   const values = keys.map((k) => fields[k]);
 
   const sql = `UPDATE repositories SET ${setClause} WHERE id = ?`;
-  await pool.execute(sql, [...values, id]);
+  await pool.execute(sql, sqlParams([...values, id]));
   return findById(id);
 };
 
@@ -74,8 +89,8 @@ const update = async (id, fields) => {
 
 const remove = async (id) => {
   const sql = 'DELETE FROM repositories WHERE id = ?';
-  const [result] = await pool.execute(sql, [id]);
+  const [result] = await pool.execute(sql, sqlParams([id]));
   return result.affectedRows > 0;
 };
 
-module.exports = { create, findById, findByUserId, findCompleted, findActiveByUserId, update, remove };
+module.exports = { create, findById, findByUserId, findCompleted, findCompletedByUserId, findActiveByUserId, update, remove };

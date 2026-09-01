@@ -3,11 +3,7 @@ import Sidebar from './Sidebar';
 import CodeViewer from './CodeViewer';
 import MarkdownRenderer from './MarkdownRenderer';
 import { ThinkingTool } from '@/components/ui/thinking-tool';
-import {
-  fetchCompletedRepositories,
-  fetchConversation,
-  sendChatMessage,
-} from '../services/api';
+import { useApiClient } from '../services/useApiClient';
 import type {
   Repository,
   ChatMessage,
@@ -27,6 +23,7 @@ import {
 } from 'lucide-react';
 
 export default function ChatInterface() {
+  const api = useApiClient();
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [selectedRepoId, setSelectedRepoId] = useState<number | null>(null);
   const [conversationId, setConversationId] = useState<number | null>(null);
@@ -72,7 +69,7 @@ export default function ChatInterface() {
     async function initialize() {
       setIsLoadingRepos(true);
       try {
-        const repos = await fetchCompletedRepositories();
+        const repos = await api.fetchCompletedRepositories();
         if (!isMounted) return;
         setRepositories(repos);
 
@@ -85,7 +82,7 @@ export default function ChatInterface() {
           setConversationId(convId);
           setIsLoadingConv(true);
           try {
-            const convData = await fetchConversation(convId);
+            const convData = await api.fetchConversation(convId);
             if (!isMounted) return;
             setMessages(convData.messages || []);
             setSelectedRepoId(convData.repository_id);
@@ -206,7 +203,7 @@ export default function ChatInterface() {
     setIsSubmitting(true);
 
     try {
-      const response = await sendChatMessage({
+      const response = await api.sendChatMessage({
         conversation_id: conversationId || undefined,
         repository_id: selectedRepoId,
         message: userText,

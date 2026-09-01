@@ -24,6 +24,7 @@ import httpx
 
 from app.config import settings
 from app.services.llm_service import get_llm_provider
+from app.services.node_internal_client import async_internal_get
 from app.services.retrieval_service import retrieve_relevant_chunks
 
 logger = logging.getLogger(__name__)
@@ -67,8 +68,7 @@ async def get_repository_info(repository_id: int) -> dict:
     url = f"{settings.node_api_url}/api/repositories/{repository_id}"
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(url)
+        response = await async_internal_get(url)
     except (httpx.ConnectError, httpx.TimeoutException, httpx.RequestError) as exc:
         logger.error("Failed to reach Node backend at %s: %s", url, exc)
         raise HTTPException(

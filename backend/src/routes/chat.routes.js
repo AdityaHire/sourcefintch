@@ -3,11 +3,11 @@
  */
 
 const { Router } = require('express');
+const requireAuth = require('../middleware/requireAuth');
 const { handleChat } = require('../controllers/chat.controller');
 
 const router = Router();
 
-// POST /api/chat
-router.post('/', handleChat);
+router.post('/', requireAuth, handleChat);
 
 module.exports = router;

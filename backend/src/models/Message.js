@@ -7,6 +7,7 @@
  */
 
 const { pool } = require('../config/database');
+const { sqlParams } = require('../utils/sqlParams');
 
 const parseMessage = (row) => {
   if (!row) return null;
@@ -24,23 +25,22 @@ const parseMessage = (row) => {
 // ── CREATE ──────────────────────────────────────────────────────────────────
 
 const create = async ({ conversationId, role, content, sources = null }) => {
+  // Coerce sources defensively: null / undefined → null, arrays → JSON.
   const serializedSources =
-    sources !== null && sources !== undefined
-      ? typeof sources === 'string'
-        ? sources
-        : JSON.stringify(sources)
-      : null;
+    sources == null
+      ? null
+      : typeof sources === 'string'
+      ? sources
+      : JSON.stringify(sources);
 
   const sql = `
     INSERT INTO messages (conversation_id, role, content, sources)
     VALUES (?, ?, ?, ?)
   `;
-  const [result] = await pool.execute(sql, [
-    conversationId,
-    role,
-    content,
-    serializedSources,
-  ]);
+  const [result] = await pool.execute(
+    sql,
+    sqlParams([conversationId, role, content, serializedSources])
+  );
   return findById(result.insertId);
 };
 
@@ -48,7 +48,7 @@ const create = async ({ conversationId, role, content, sources = null }) => {
 
 const findById = async (id) => {
   const sql = 'SELECT * FROM messages WHERE id = ?';
-  const [rows] = await pool.execute(sql, [id]);
+  const [rows] = await pool.execute(sql, sqlParams([id]));
   return parseMessage(rows[0]) || null;
 };
 
@@ -62,7 +62,7 @@ const findByConversationId = async (conversationId) => {
     WHERE conversation_id = ?
     ORDER BY created_at ASC, id ASC
   `;
-  const [rows] = await pool.execute(sql, [conversationId]);
+  const [rows] = await pool.execute(sql, sqlParams([conversationId]));
   return rows.map(parseMessage);
 };
 
@@ -70,7 +70,7 @@ const findByConversationId = async (conversationId) => {
 
 const remove = async (id) => {
   const sql = 'DELETE FROM messages WHERE id = ?';
-  const [result] = await pool.execute(sql, [id]);
+  const [result] = await pool.execute(sql, sqlParams([id]));
   return result.affectedRows > 0;
 };
 

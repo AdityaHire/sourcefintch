@@ -9,6 +9,7 @@
  */
 
 const { pool } = require('../config/database');
+const { sqlParams } = require('../utils/sqlParams');
 
 // ── CREATE ──────────────────────────────────────────────────────────────────
 
@@ -23,16 +24,19 @@ const create = async ({
   end_line,
   language = null,
 }) => {
-  const fId = fileId || file_id;
-  const qPointId = qdrantPointId || qdrant_point_id || null;
-  const sLine = startLine !== undefined ? startLine : start_line;
-  const eLine = endLine !== undefined ? endLine : end_line;
+  const fId = fileId ?? file_id ?? null;
+  const qPointId = qdrantPointId ?? qdrant_point_id ?? null;
+  const sLine = startLine ?? start_line ?? null;
+  const eLine = endLine ?? end_line ?? null;
 
   const sql = `
     INSERT INTO code_chunks (file_id, qdrant_point_id, start_line, end_line, language)
     VALUES (?, ?, ?, ?, ?)
   `;
-  const [result] = await pool.execute(sql, [fId, qPointId, sLine, eLine, language]);
+  const [result] = await pool.execute(
+    sql,
+    sqlParams([fId, qPointId, sLine, eLine, language])
+  );
   return findById(result.insertId);
 };
 
@@ -41,16 +45,19 @@ const create = async ({
  *
  * Guarantees that returned items match the exact order of `chunksArray`
  * with their generated database `id` and `qdrant_point_id`.
+ *
+ * Every parameter is coerced to null when undefined so mysql2 accepts it
+ * (fields from Qdrant payloads may omit `language` or `qdrant_point_id`).
  */
 const createMany = async (chunksArray) => {
   if (!chunksArray || chunksArray.length === 0) return [];
 
   const normalized = chunksArray.map((c) => ({
-    fileId: c.fileId || c.file_id,
-    qdrantPointId: c.qdrantPointId || c.qdrant_point_id || null,
-    startLine: c.startLine !== undefined ? c.startLine : c.start_line,
-    endLine: c.endLine !== undefined ? c.endLine : c.end_line,
-    language: c.language || null,
+    fileId: c.fileId ?? c.file_id ?? null,
+    qdrantPointId: c.qdrantPointId ?? c.qdrant_point_id ?? null,
+    startLine: c.startLine ?? c.start_line ?? null,
+    endLine: c.endLine ?? c.end_line ?? null,
+    language: c.language ?? null,
   }));
 
   const placeholders = normalized.map(() => '(?, ?, ?, ?, ?)').join(', ');
@@ -63,7 +70,7 @@ const createMany = async (chunksArray) => {
   ]);
 
   const sql = `INSERT INTO code_chunks (file_id, qdrant_point_id, start_line, end_line, language) VALUES ${placeholders}`;
-  const [result] = await pool.execute(sql, values);
+  const [result] = await pool.execute(sql, sqlParams(values));
 
   const firstId = result.insertId;
   return normalized.map((item, index) => ({
@@ -80,13 +87,13 @@ const createMany = async (chunksArray) => {
 
 const findById = async (id) => {
   const sql = 'SELECT * FROM code_chunks WHERE id = ?';
-  const [rows] = await pool.execute(sql, [id]);
+  const [rows] = await pool.execute(sql, sqlParams([id]));
   return rows[0] || null;
 };
 
 const findByFileId = async (fileId) => {
   const sql = 'SELECT * FROM code_chunks WHERE file_id = ? ORDER BY start_line';
-  const [rows] = await pool.execute(sql, [fileId]);
+  const [rows] = await pool.execute(sql, sqlParams([fileId]));
   return rows;
 };
 
@@ -98,13 +105,13 @@ const deleteByRepositoryId = async (repositoryId) => {
     INNER JOIN files f ON cc.file_id = f.id
     WHERE f.repository_id = ?
   `;
-  const [result] = await pool.execute(sql, [repositoryId]);
+  const [result] = await pool.execute(sql, sqlParams([repositoryId]));
   return result.affectedRows;
 };
 
 const remove = async (id) => {
   const sql = 'DELETE FROM code_chunks WHERE id = ?';
-  const [result] = await pool.execute(sql, [id]);
+  const [result] = await pool.execute(sql, sqlParams([id]));
   return result.affectedRows > 0;
 };
 

@@ -6,15 +6,19 @@
  */
 
 const { pool } = require('../config/database');
+const { sqlParams } = require('../utils/sqlParams');
 
 // ── CREATE ──────────────────────────────────────────────────────────────────
 
-const create = async ({ userId, repositoryId, title = 'New Conversation' }) => {
+const create = async ({ userId, repositoryId = null, title = 'New Conversation' }) => {
   const sql = `
     INSERT INTO conversations (user_id, repository_id, title)
     VALUES (?, ?, ?)
   `;
-  const [result] = await pool.execute(sql, [userId, repositoryId, title]);
+  const [result] = await pool.execute(
+    sql,
+    sqlParams([userId, repositoryId, title])
+  );
   return findById(result.insertId);
 };
 
@@ -22,19 +26,19 @@ const create = async ({ userId, repositoryId, title = 'New Conversation' }) => {
 
 const findById = async (id) => {
   const sql = 'SELECT * FROM conversations WHERE id = ?';
-  const [rows] = await pool.execute(sql, [id]);
+  const [rows] = await pool.execute(sql, sqlParams([id]));
   return rows[0] || null;
 };
 
 const findByUserId = async (userId) => {
   const sql = 'SELECT * FROM conversations WHERE user_id = ? ORDER BY updated_at DESC';
-  const [rows] = await pool.execute(sql, [userId]);
+  const [rows] = await pool.execute(sql, sqlParams([userId]));
   return rows;
 };
 
 const findByRepositoryId = async (repositoryId) => {
   const sql = 'SELECT * FROM conversations WHERE repository_id = ? ORDER BY updated_at DESC';
-  const [rows] = await pool.execute(sql, [repositoryId]);
+  const [rows] = await pool.execute(sql, sqlParams([repositoryId]));
   return rows;
 };
 
@@ -45,7 +49,7 @@ const findMostRecentByUserIdAndRepositoryId = async (userId, repositoryId) => {
     ORDER BY updated_at DESC
     LIMIT 1
   `;
-  const [rows] = await pool.execute(sql, [userId, repositoryId]);
+  const [rows] = await pool.execute(sql, sqlParams([userId, repositoryId]));
   return rows[0] || null;
 };
 
@@ -61,7 +65,7 @@ const update = async (id, fields) => {
   const values = keys.map((k) => fields[k]);
 
   const sql = `UPDATE conversations SET ${setClause} WHERE id = ?`;
-  await pool.execute(sql, [...values, id]);
+  await pool.execute(sql, sqlParams([...values, id]));
   return findById(id);
 };
 
@@ -69,7 +73,7 @@ const update = async (id, fields) => {
 
 const remove = async (id) => {
   const sql = 'DELETE FROM conversations WHERE id = ?';
-  const [result] = await pool.execute(sql, [id]);
+  const [result] = await pool.execute(sql, sqlParams([id]));
   return result.affectedRows > 0;
 };
 

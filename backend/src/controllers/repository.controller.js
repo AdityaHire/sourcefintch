@@ -1,9 +1,9 @@
 /**
  * Repository controller — handles GitHub ingestion endpoints.
  *
- * POST /api/repositories      — start ingesting a GitHub repo
- * GET  /api/repositories/:id  — fetch ingestion status
- * GET  /api/repositories/:id/files — fetch stored file list
+ * Auth source: req.auth.userId (Clerk) set by requireAuth middleware.
+ * Internal calls (AI service) reach GET /:id via x-internal-secret and
+ * must NOT pass ownership checks.
  */
 
 const { parse } = require('../utils/githubUrlParser');
@@ -12,8 +12,7 @@ const { ingestRepository } = require('../services/ingestionService');
 const Repository = require('../models/Repository');
 const File = require('../models/File');
 const CodeChunk = require('../models/CodeChunk');
-
-const PLACEHOLDER_USER_ID = 1;
+const { getAuth } = require('@clerk/express');
 
 const VALID_STATUSES = [
   'pending',
@@ -25,9 +24,15 @@ const VALID_STATUSES = [
   'failed',
 ];
 
+// `req.auth` is a function (Clerk v1+ API), not a plain object.  Always
+// call `getAuth(req)` to read `userId` / `sessionClaims`.  This helper
+// returns the current Clerk userId or null.
+const userId = (req) => getAuth(req)?.userId ?? null;
+
 const createRepository = async (req, res, next) => {
   try {
     const { github_url, branch } = req.body;
+    const currentUserId = userId(req);
 
     if (!github_url || typeof github_url !== 'string') {
       const err = new Error('github_url is required');
@@ -39,15 +44,17 @@ const createRepository = async (req, res, next) => {
 
     const repoInfo = await validateRepo(owner, repo);
 
-    const activeRepos = await Repository.findActiveByUserId(PLACEHOLDER_USER_ID);
+    const activeRepos = await Repository.findActiveByUserId(currentUserId);
     if (activeRepos.length > 0) {
-      const err = new Error('You already have a repository in progress. Please wait for it to complete.');
+      const err = new Error(
+        'You already have a repository in progress. Please wait for it to complete.'
+      );
       err.statusCode = 429;
       throw err;
     }
 
     const repository = await Repository.create({
-      userId: PLACEHOLDER_USER_ID,
+      userId: currentUserId,
       name: repoInfo.name,
       owner,
       githubUrl: github_url,
@@ -79,21 +86,22 @@ const getRepository = async (req, res, next) => {
       throw err;
     }
 
+    // Ownership check for authenticated callers.  Internal AI-service calls
+    // (`getAuth(req).userId` falsy when middleware passed via x-internal-secret)
+    // are allowed through.
+    const currentUserId = userId(req);
+    if (currentUserId && repository.user_id !== currentUserId) {
+      const err = new Error('Repository not found');
+      err.statusCode = 404;
+      throw err;
+    }
+
     res.json(repository);
   } catch (error) {
     next(error);
   }
 };
 
-/**
- * Return the list of files stored for a repository.
- *
- * The Python AI service calls this to learn exactly which files to parse.
- * The list comes from MySQL (populated during Phase 3 ingestion), so it
- * already reflects all Node-side filtering (ignored dirs, binary extensions,
- * size limits, symlink exclusion).  Python trusts this list rather than
- * re-implementing filtering rules.
- */
 const getRepositoryFiles = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -112,10 +120,6 @@ const getRepositoryFiles = async (req, res, next) => {
   }
 };
 
-/**
- * Internal status update endpoint — called by the Python AI service
- * to advance status through 'embedding' -> 'completed' (or 'failed').
- */
 const updateRepositoryStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -143,10 +147,6 @@ const updateRepositoryStatus = async (req, res, next) => {
   }
 };
 
-/**
- * Internal chunk cleanup endpoint — called by the Python AI service
- * before re-indexing or during compensating rollback on upsert failure.
- */
 const deleteRepositoryChunks = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -168,13 +168,9 @@ const deleteRepositoryChunks = async (req, res, next) => {
   }
 };
 
-/**
- * List all completed repositories.
- * Used by the frontend repository selector.
- */
 const listCompletedRepositories = async (req, res, next) => {
   try {
-    const repos = await Repository.findCompleted();
+    const repos = await Repository.findCompletedByUserId(userId(req));
     res.json(repos);
   } catch (error) {
     next(error);
@@ -184,9 +180,16 @@ const listCompletedRepositories = async (req, res, next) => {
 const deleteRepository = async (req, res, next) => {
   try {
     const { id } = req.params;
+    const currentUserId = userId(req);
     const repository = await Repository.findById(id);
 
     if (!repository) {
+      const err = new Error('Repository not found');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    if (repository.user_id !== currentUserId) {
       const err = new Error('Repository not found');
       err.statusCode = 404;
       throw err;
@@ -218,4 +221,3 @@ module.exports = {
   deleteRepositoryChunks,
   deleteRepository,
 };
-

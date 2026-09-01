@@ -1,8 +1,13 @@
 /**
  * API service layer — all HTTP calls live here.
  *
- * Using plain `fetch` instead of axios to keep dependencies minimal.
- * Each function returns the parsed JSON or throws on failure.
+ * Each function takes an `authedFetch` (a `fetch`-shaped function that
+ * attaches `Authorization: Bearer <clerk-token>`) so callers from
+ * `useApiClient` get authenticated calls without bypassing the wrapper.
+ *
+ * The AI service is called directly (no token) because that service is
+ * the same-origin backend from a network perspective and only accepts
+ * x-internal-secret from the Python side, never browser-originated calls.
  */
 
 import type {
@@ -15,140 +20,99 @@ import type {
 const AI_SERVICE_URL =
   import.meta.env.VITE_AI_SERVICE_URL || 'http://localhost:8000';
 
-/**
- * Check the Node.js backend health.
- * Uses the Vite proxy, so we just call `/api/health` (no port needed).
- */
-export async function checkBackendHealth(): Promise<HealthResponse> {
+export type AuthedFetch = (
+  input: string,
+  init?: RequestInit
+) => Promise<Response>;
+
+const jsonOrThrow = async (res: Response, fallback: string) => {
+  if (res.ok) return res.json();
+  const data = await res.json().catch(() => ({}));
+  const err: any = new Error(data.message || fallback);
+  err.statusCode = res.status;
+  err.details = data;
+  throw err;
+};
+
+export async function checkBackendHealth(_authedFetch?: AuthedFetch): Promise<HealthResponse> {
   const res = await fetch('/api/health');
   if (!res.ok) throw new Error(`Backend returned ${res.status}`);
   return res.json();
 }
 
-/**
- * Check the Python AI service health.
- * Called directly (not proxied) because it's a separate server.
- */
 export async function checkAIServiceHealth(): Promise<HealthResponse> {
   const res = await fetch(`${AI_SERVICE_URL}/health`);
   if (!res.ok) throw new Error(`AI service returned ${res.status}`);
   return res.json();
 }
 
-/**
- * Fetch all completed repositories available for querying.
- */
-export async function fetchCompletedRepositories(): Promise<Repository[]> {
-  const res = await fetch('/api/repositories');
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.message || `Failed to fetch repositories (${res.status})`);
-  }
-  return res.json();
+export async function fetchCompletedRepositories(
+  authedFetch: AuthedFetch
+): Promise<Repository[]> {
+  const res = await authedFetch('/api/repositories');
+  return jsonOrThrow(res, 'Failed to fetch repositories');
 }
 
-/**
- * Create a new conversation thread.
- */
 export async function createConversation(
+  authedFetch: AuthedFetch,
   repositoryId: number,
   title?: string
 ): Promise<Conversation> {
-  const res = await fetch('/api/conversations', {
+  const res = await authedFetch('/api/conversations', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ repository_id: repositoryId, title }),
   });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.message || `Failed to create conversation (${res.status})`);
-  }
-  return res.json();
+  return jsonOrThrow(res, 'Failed to create conversation');
 }
 
-/**
- * Fetch a conversation by ID with its full message history.
- */
-export async function fetchConversation(conversationId: number): Promise<Conversation> {
-  const res = await fetch(`/api/conversations/${conversationId}`);
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.message || `Failed to fetch conversation (${res.status})`);
-  }
-  return res.json();
+export async function fetchConversation(
+  authedFetch: AuthedFetch,
+  conversationId: number
+): Promise<Conversation> {
+  const res = await authedFetch(`/api/conversations/${conversationId}`);
+  return jsonOrThrow(res, 'Failed to fetch conversation');
 }
 
-/**
- * Trigger ingestion for a new GitHub repository.
- */
 export async function createRepository(
+  authedFetch: AuthedFetch,
   githubUrl: string,
   branch?: string
 ): Promise<{ id: number; name: string; status: string }> {
-  const res = await fetch('/api/repositories', {
+  const res = await authedFetch('/api/repositories', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ github_url: githubUrl, branch: branch || undefined }),
   });
-
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    const err: any = new Error(data.message || `Failed to add repository (${res.status})`);
-    err.statusCode = res.status;
-    throw err;
-  }
-
-  return res.json();
+  return jsonOrThrow(res, 'Failed to add repository');
 }
 
-/**
- * Fetch a single repository's status by ID.
- */
-export async function getRepository(id: number): Promise<Repository> {
-  const res = await fetch(`/api/repositories/${id}`);
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.message || `Failed to fetch repository (${res.status})`);
-  }
-  return res.json();
+export async function getRepository(
+  authedFetch: AuthedFetch,
+  id: number
+): Promise<Repository> {
+  const res = await authedFetch(`/api/repositories/${id}`);
+  return jsonOrThrow(res, 'Failed to fetch repository');
 }
 
-/**
- * Delete a repository and its associated indexed chunks.
- */
-export async function deleteRepository(id: number): Promise<{ success: boolean; id: number }> {
-  const res = await fetch(`/api/repositories/${id}`, {
-    method: 'DELETE',
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.message || `Failed to delete repository (${res.status})`);
-  }
-  return res.json();
+export async function deleteRepository(
+  authedFetch: AuthedFetch,
+  id: number
+): Promise<{ success: boolean; id: number }> {
+  const res = await authedFetch(`/api/repositories/${id}`, { method: 'DELETE' });
+  return jsonOrThrow(res, 'Failed to delete repository');
 }
 
-/**
- * Send a chat message through Node's orchestrator.
- */
-export async function sendChatMessage(payload: {
-  conversation_id?: number;
-  repository_id: number;
-  message: string;
-  new_conversation?: boolean;
-}): Promise<ChatResponse> {
-  const res = await fetch('/api/chat', {
+export async function sendChatMessage(
+  authedFetch: AuthedFetch,
+  payload: {
+    conversation_id?: number;
+    repository_id: number;
+    message: string;
+    new_conversation?: boolean;
+  }
+): Promise<ChatResponse> {
+  const res = await authedFetch('/api/chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    const err: any = new Error(data.message || `Chat request failed (${res.status})`);
-    err.statusCode = res.status;
-    err.details = data;
-    throw err;
-  }
-
-  return res.json();
+  return jsonOrThrow(res, 'Chat request failed');
 }
