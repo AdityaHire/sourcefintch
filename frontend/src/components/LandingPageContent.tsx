@@ -191,7 +191,7 @@ export default function LandingPageContent({ onExplore, onOpenDocs }: LandingPag
       </section>
 
       {/* ── 2. HOW TO USE (3-Step Guided Walkthrough) ───────────────────── */}
-      <section className="relative px-6 sm:px-12 py-20 border-t border-zinc-200/70 dark:border-zinc-800/60 bg-zinc-50/40 dark:bg-zinc-950/40 backdrop-blur-xs">
+      <section className="relative px-6 sm:px-12 py-20 bg-zinc-50/40 dark:bg-zinc-950/40 backdrop-blur-xs">
         <div className="max-w-6xl mx-auto w-full">
           <motion.div
             variants={sectionVariants}

@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import Sidebar from './Sidebar';
 import CodeViewer from './CodeViewer';
 import MarkdownRenderer from './MarkdownRenderer';
 import { ThinkingTool } from '@/components/ui/thinking-tool';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { Banner } from './ui/Banner';
 import { Skeleton } from './ui/Skeleton';
 import { StatusDot } from './ui/StatusDot';
@@ -16,7 +17,6 @@ import type {
 import {
   Code,
   Plus,
-  ArrowUp,
   FileCode,
   Sparkles,
   Menu,
@@ -25,14 +25,35 @@ import {
   Code2,
   FileSearch,
 } from 'lucide-react';
+import {
+  PromptInputBox,
+  type PromptInputBoxHandle,
+} from './ui/PromptInputBox';
+import type { SidebarTab } from './Sidebar';
 
-export default function ChatInterface() {
+export interface ChatInterfaceProps {
+  /** Which workspace tab is active — drives Sidebar nav highlight. */
+  activeTab?: SidebarTab;
+  onNavigateTo?: (tab: SidebarTab) => void;
+  onOpenDocs?: () => void;
+  theme?: 'light' | 'dark';
+  setTheme?: (next: 'light' | 'dark') => void;
+}
+
+export default function ChatInterface(props: ChatInterfaceProps = {}) {
+  const {
+    activeTab = 'workspace',
+    onNavigateTo = () => {},
+    onOpenDocs = () => {},
+    theme = 'light',
+    setTheme = () => {},
+  } = props;
+
   const api = useApiClient();
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [selectedRepoId, setSelectedRepoId] = useState<number | null>(null);
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [inputQuery, setInputQuery] = useState('');
   const [isLoadingRepos, setIsLoadingRepos] = useState(true);
   const [isLoadingConv, setIsLoadingConv] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -43,7 +64,7 @@ export default function ChatInterface() {
   const [isCodeViewerOpen, setIsCodeViewerOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const composerRef = useRef<PromptInputBoxHandle>(null);
 
   // ── Auto-scroll to bottom of message list ─────────────────────────────────
   const scrollToBottom = () => {
@@ -53,18 +74,6 @@ export default function ChatInterface() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isSubmitting]);
-
-  // ── Auto-resize composer textarea ─────────────────────────────────────────
-  const adjustTextareaHeight = () => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 160)}px`;
-    }
-  };
-
-  useEffect(() => {
-    adjustTextareaHeight();
-  }, [inputQuery]);
 
   // ── 1. Initial Load: Repositories & URL-Driven Persistence ────────────────
   useEffect(() => {
@@ -163,7 +172,7 @@ export default function ChatInterface() {
       setErrorMessage(err.message || 'Failed to create new conversation');
     }
 
-    textareaRef.current?.focus();
+    composerRef.current?.focus();
   };
 
   const handleRepoAdded = (newRepo: Repository) => {
@@ -190,11 +199,12 @@ export default function ChatInterface() {
   };
 
   // ── Send chat message ─────────────────────────────────────────────────────
-  const handleSendMessage = async (customPrompt?: string) => {
-    const userText = (customPrompt || inputQuery).trim();
+  const handleSendMessage = async (textFromComposer?: string) => {
+    // The PromptInputBox already trims and gates on disabled/sending,
+    // so any non-empty string we get is safe to send.
+    const userText = (textFromComposer ?? '').trim();
     if (!userText || !selectedRepoId || isSubmitting) return;
 
-    setInputQuery('');
     setErrorMessage(null);
 
     const optimisticUserMsg: ChatMessage = {
@@ -244,14 +254,7 @@ export default function ChatInterface() {
       setErrorMessage(err.message || 'An error occurred while answering your question.');
     } finally {
       setIsSubmitting(false);
-      textareaRef.current?.focus();
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
+      composerRef.current?.focus();
     }
   };
 
@@ -292,7 +295,6 @@ export default function ChatInterface() {
     () => repositories.find((r) => r.id === selectedRepoId) || null,
     [repositories, selectedRepoId]
   );
-  const hasTextToSend = inputQuery.trim().length > 0;
 
   // Suggested starter prompts
   const starterPrompts = [
@@ -315,6 +317,9 @@ export default function ChatInterface() {
         onRepoDeleted={handleRepoDeleted}
         isOpenMobile={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
+        activeTab={activeTab}
+        onNavigateTo={onNavigateTo}
+        onOpenDocs={onOpenDocs}
       />
 
       {/* ── 2. CENTER PANEL: Chat Workspace ───────────────────────────────── */}
@@ -390,6 +395,12 @@ export default function ChatInterface() {
               <Plus className="w-3.5 h-3.5" />
               <span>New Chat</span>
             </button>
+
+            {/* Theme toggle — sits beside the New Chat action */}
+            <ThemeToggle
+              isDark={theme === 'dark'}
+              onToggle={(isDark) => setTheme(isDark ? 'dark' : 'light')}
+            />
           </div>
         </div>
 
@@ -462,7 +473,7 @@ export default function ChatInterface() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
                     className={`flex flex-col ${
-                      index > 0 && !isUser ? 'pt-4 border-t border-zinc-100 dark:border-zinc-900/80' : ''
+                      index > 0 && !isUser ? 'pt-4' : ''
                     }`}
                   >
                     {/* Header: Identity & Timestamp */}
@@ -514,8 +525,8 @@ export default function ChatInterface() {
                               </span>
                             </div>
 
-                            {/* Source Rows Table */}
-                            <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 overflow-hidden divide-y divide-zinc-100 dark:divide-zinc-800/60 shadow-2xs">
+                            {/* Source Rows — no row dividers; hover background distinguishes rows. */}
+                            <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 overflow-hidden shadow-2xs">
                               {msg.sources.map((source: SourceCitation, sIdx: number) => {
                                 const isSelected =
                                   isCodeViewerOpen &&
@@ -580,47 +591,26 @@ export default function ChatInterface() {
           )}
         </div>
 
-        {/* ── 3. Bottom Composer: Elevated, Anchored, Professional ─────────── */}
+        {/* ── 3. Bottom Composer: PromptInputBox ───────────────────────────────── */}
         <div className="relative z-10 border-t border-zinc-200/80 dark:border-zinc-800/60 bg-white/60 dark:bg-zinc-950/60 p-3 sm:p-4 shrink-0 backdrop-blur-md">
           <div className="max-w-3xl mx-auto w-full">
-            <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="relative font-sans-ui">
-              <div className="flex items-center gap-2 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 px-3.5 py-2.5 shadow-md shadow-zinc-200/50 dark:shadow-black/30 focus-within:border-zinc-400 dark:focus-within:border-zinc-600 focus-within:ring-2 focus-within:ring-zinc-400/20 transition-all">
-                <textarea
-                  ref={textareaRef}
-                  rows={1}
-                  value={inputQuery}
-                  onChange={(e) => setInputQuery(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={
-                    selectedRepoId
-                      ? 'Ask anything about this repository...'
-                      : 'Select a repository to start'
-                  }
-                  disabled={!selectedRepoId || isSubmitting}
-                  className="flex-1 resize-none bg-transparent py-1 text-[13.5px] text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed max-h-36 leading-relaxed font-sans-ui select-text"
-                />
+            <PromptInputBox
+              ref={composerRef}
+              placeholder={
+                selectedRepoId
+                  ? 'Ask anything about this repository...'
+                  : 'Select a repository to start'
+              }
+              disabled={!selectedRepoId || isSubmitting}
+              status={isSubmitting ? 'sending' : 'idle'}
+              onSend={handleSendMessage}
+            />
 
-                {/* Send Button */}
-                <button
-                  type="submit"
-                  disabled={!hasTextToSend || !selectedRepoId || isSubmitting}
-                  className={`h-7 w-7 rounded-lg flex items-center justify-center transition-all duration-200 shrink-0 ${
-                    hasTextToSend && selectedRepoId && !isSubmitting
-                      ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-200 cursor-pointer shadow-xs scale-100'
-                      : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed opacity-50'
-                  }`}
-                  title={hasTextToSend ? 'Send message (Enter)' : 'Enter message'}
-                >
-                  <ArrowUp className="h-4 w-4" />
-                </button>
-              </div>
-
-              {/* Subdued User Benefit Copy */}
-              <div className="mt-1.5 px-1 flex items-center justify-between text-[11px] text-zinc-400 dark:text-zinc-500 font-sans-ui">
-                <span>Answers grounded in your source code</span>
-                <span className="hidden sm:inline font-code text-[10px]">Return ↵ to send</span>
-              </div>
-            </form>
+            {/* Subdued User Benefit Copy */}
+            <div className="mt-1.5 px-1 flex items-center justify-between text-[11px] text-zinc-400 dark:text-zinc-500 font-sans-ui">
+              <span>Answers grounded in your source code</span>
+              <span className="hidden sm:inline font-code text-[10px]">Return ↵ to send</span>
+            </div>
           </div>
         </div>
       </div>

@@ -16,6 +16,7 @@ import CinematicLandingHero from '../components/CinematicLandingHero';
 import LandingPageContent from '../components/LandingPageContent';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { ShaderBackground } from '@/components/ui/waves-shader';
+import { Modal } from '../components/ui/Modal';
 
 export default function LandingPage() {
   // Hooks MUST be called unconditionally at the top — no early returns
@@ -101,37 +102,26 @@ export default function LandingPage() {
         Sourcefinch · AI-powered codebase intelligence
       </footer>
 
-      {/* Docs modal placeholder — reuse the same shell from WorkspacePage if needed */}
-      {isDocsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-xl rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-2xl">
-            <div className="flex items-center justify-between mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-3">
-              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                Sourcefinch · Guide
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsDocsOpen(false)}
-                className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
-              >
-                ✕
-              </button>
-            </div>
-            <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-              Sign in to connect a repository and start asking questions about your code.
-            </p>
-            <div className="mt-5 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setIsDocsOpen(false)}
-                className="rounded-lg bg-black dark:bg-white text-white dark:text-black px-4 py-1.5 text-xs font-semibold"
-              >
-                Got it
-              </button>
-            </div>
-          </div>
+      {/* Docs modal — uses shared Modal so the divider/title behaviour matches WorkspacePage */}
+      <Modal
+        open={isDocsOpen}
+        onClose={() => setIsDocsOpen(false)}
+        size="lg"
+        title="Sourcefinch · Guide"
+      >
+        <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+          Sign in to connect a repository and start asking questions about your code.
+        </p>
+        <div className="mt-5 flex justify-end">
+          <button
+            type="button"
+            onClick={() => setIsDocsOpen(false)}
+            className="rounded-[var(--radius-sm)] bg-black dark:bg-white text-white dark:text-black px-4 py-1.5 text-xs font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors"
+          >
+            Got it
+          </button>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

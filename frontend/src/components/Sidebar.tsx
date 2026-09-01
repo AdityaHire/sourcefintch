@@ -7,6 +7,7 @@ import { useApiClient } from '../services/useApiClient';
 import { StatusDot } from './ui/StatusDot';
 import { Modal } from './ui/Modal';
 import { RepoIngestionLoader } from '@/components/ui/repo-ingestion-loader';
+import { UserButton, useUser, SignInButton } from '@clerk/clerk-react';
 import {
   Plus,
   Trash2,
@@ -15,7 +16,12 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  Home,
+  MessageSquare,
+  BookOpen,
 } from 'lucide-react';
+
+export type SidebarTab = 'workspace' | 'landing';
 
 interface SidebarProps {
   repositories: Repository[];
@@ -26,6 +32,10 @@ interface SidebarProps {
   onRepoDeleted?: (deletedRepoId: number) => void;
   isOpenMobile?: boolean;
   onCloseMobile?: () => void;
+  /** Currently active workspace tab (drives the Overview/Workspace nav highlight). */
+  activeTab: SidebarTab;
+  onNavigateTo: (tab: SidebarTab) => void;
+  onOpenDocs: () => void;
 }
 
 export default function Sidebar({
@@ -37,8 +47,15 @@ export default function Sidebar({
   onRepoDeleted,
   isOpenMobile = false,
   onCloseMobile,
+  activeTab,
+  onNavigateTo,
+  onOpenDocs,
 }: SidebarProps) {
   const api = useApiClient();
+  // ── Clerk session — for the user footer row (image + name + menu) ──
+  // Hooks MUST be called unconditionally at the top; Clerk's useUser is safe
+  // to call even when the user is signed out.
+  const { isSignedIn, user, isLoaded: userLoaded } = useUser();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -47,30 +64,20 @@ export default function Sidebar({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [indexingStatus, setIndexingStatus] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  // Delete repository state
   const [repoToDelete, setRepoToDelete] = useState<Repository | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // Deduplicate repositories by ID to prevent duplicate items in sidebar
-  const uniqueRepos = useMemo(() => {
-    const map = new Map<number, Repository>();
-    repositories.forEach((r) => {
-      if (!map.has(r.id)) {
-        map.set(r.id, r);
-      }
-    });
-    return Array.from(map.values());
-  }, [repositories]);
+  const uniqueRepos = useMemo(() => repositories, [repositories]);
 
   const filteredRepos = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return uniqueRepos;
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return uniqueRepos;
     return uniqueRepos.filter(
-      (repo) =>
-        repo.name.toLowerCase().includes(query) ||
-        repo.owner.toLowerCase().includes(query)
+      (r) =>
+        r.name.toLowerCase().includes(q) ||
+        r.owner.toLowerCase().includes(q) ||
+        (r.github_url || '').toLowerCase().includes(q)
     );
   }, [uniqueRepos, searchQuery]);
 
@@ -80,61 +87,62 @@ export default function Sidebar({
 
     setIsSubmitting(true);
     setErrorMessage(null);
-    setIndexingStatus('Initiating ingestion pipeline...');
+    setIndexingStatus('Cloning repository…');
 
     try {
-      const initResult = await api.createRepository(githubUrl.trim(), branch.trim() || undefined);
-      const repoId = initResult.id;
-      setIndexingStatus(`Indexing started (ID: ${repoId}). Ingesting & embedding code chunks...`);
+      const initResult = await api.createRepository(
+        githubUrl.trim(),
+        branch.trim() || undefined
+      );
+      onRepoAdded(initResult as unknown as Repository);
+      setGithubUrl('');
+      setBranch('');
+      setIsModalOpen(false);
 
-      // Poll until completed or failed (up to 45s)
+      // Poll until completed or failed (best-effort UX)
       let attempts = 0;
-      const pollInterval = setInterval(async () => {
-        attempts++;
+      const maxAttempts = 120; // ~4 minutes at 2s interval
+      const poll = async () => {
+        if (attempts >= maxAttempts) return;
+        attempts += 1;
         try {
-          const repo = await api.getRepository(repoId);
-          setIndexingStatus(`Current status: ${repo.status} (${repo.file_count || 0} files)`);
-
-          if (repo.status === 'completed') {
-            clearInterval(pollInterval);
-            setIsSubmitting(false);
-            setIsModalOpen(false);
-            setGithubUrl('');
-            setBranch('');
-            setIndexingStatus(null);
-            onRepoAdded(repo);
-            onSelectRepo(repo.id);
-          } else if (repo.status === 'failed') {
-            clearInterval(pollInterval);
-            setIsSubmitting(false);
-            setErrorMessage('Repository indexing failed.');
-          } else if (attempts >= 45) {
-            clearInterval(pollInterval);
-            setIsSubmitting(false);
-            setErrorMessage('Indexing timed out. Please check repository list later.');
+          const r = await api.getRepository(initResult.id);
+          if (r.status === 'completed') setIndexingStatus(null);
+          else if (r.status === 'failed') {
+            setIndexingStatus('Ingestion failed — check the repo URL.');
+            setTimeout(() => setIndexingStatus(null), 5000);
+          } else {
+            const next = r.status === 'pending' ? 'Cloning…' :
+              r.status === 'cloning' ? 'Cloning…' :
+              r.status === 'scanning' ? 'Scanning files…' :
+              r.status === 'storing' ? 'Storing chunks…' :
+              r.status === 'embedding' ? 'Embedding code…' :
+              'Processing…';
+            setIndexingStatus(next);
+            setTimeout(poll, 2000);
           }
         } catch {
-          // Ignore transient poll errors
+          setTimeout(poll, 4000);
         }
-      }, 1000);
+      };
+      setTimeout(poll, 1500);
     } catch (err: any) {
-      setIsSubmitting(false);
+      setErrorMessage(
+        err?.details?.message || err.message || 'Failed to add repository'
+      );
       setIndexingStatus(null);
-      setErrorMessage(err.message || 'Failed to submit repository for ingestion');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleConfirmDelete = async () => {
     if (!repoToDelete || isDeleting) return;
-
     setIsDeleting(true);
     setDeleteError(null);
-
     try {
       await api.deleteRepository(repoToDelete.id);
-      if (onRepoDeleted) {
-        onRepoDeleted(repoToDelete.id);
-      }
+      if (onRepoDeleted) onRepoDeleted(repoToDelete.id);
       setRepoToDelete(null);
     } catch (err: any) {
       setDeleteError(err.message || 'Failed to remove repository');
@@ -143,22 +151,155 @@ export default function Sidebar({
     }
   };
 
+  // ── Sidebar primitives ─────────────────────────────────────────────────
+  /**
+   * Sidebar nav link (Overview / Workspace / Docs).  Collapsed mode shows
+   * just the icon with a tooltip; expanded shows icon + label.
+   */
+  const NavItem = ({
+    icon: Icon,
+    label,
+    isActive,
+    onClick,
+    title,
+  }: {
+    icon: React.ComponentType<{ className?: string }>;
+    label: string;
+    isActive?: boolean;
+    onClick: () => void;
+    title?: string;
+  }) => {
+    if (isCollapsed) {
+      return (
+        <button
+          type="button"
+          onClick={onClick}
+          title={title || label}
+          className={`w-9 h-9 rounded-[var(--radius-sm)] flex items-center justify-center transition-colors duration-100 ease-out cursor-pointer mx-auto ${
+            isActive
+              ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-950'
+              : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-white'
+          }`}
+        >
+          <Icon className="w-4 h-4" />
+        </button>
+      );
+    }
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`w-full flex items-center gap-2 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-[12px] font-semibold transition-colors duration-100 ease-out cursor-pointer ${
+          isActive
+            ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-950'
+            : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
+        }`}
+      >
+        <Icon className="w-3.5 h-3.5 shrink-0" />
+        <span className="truncate">{label}</span>
+      </button>
+    );
+  };
+
   return (
     <>
       {/* ── Desktop Animated Collapsible Sidebar ──────────────────────── */}
       <motion.aside
         animate={{ width: isCollapsed ? 64 : 290 }}
         transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-        className={`relative hidden md:flex flex-col border-r border-zinc-200/80 dark:border-zinc-800/60 bg-white/40 dark:bg-zinc-950/40 backdrop-blur-md z-20 shrink-0 select-none overflow-hidden h-full`}
+        className="relative hidden md:flex flex-col border-r border-zinc-200/80 dark:border-zinc-800/60 bg-white/40 dark:bg-zinc-950/40 backdrop-blur-md z-20 shrink-0 select-none overflow-hidden h-full"
       >
-        {/* ── Top Header Bar ────────────────────────────────────────── */}
-        <div className="flex items-center justify-between border-b border-zinc-200/80 dark:border-zinc-800/60 px-3 py-3 bg-white/40 dark:bg-transparent min-h-[49px]">
+        {/* ── Brand Header (logo + collapse) ──────────────────────────── */}
+        <div className="flex items-center justify-between px-3 py-3 min-h-[49px]">
+          <AnimatePresence initial={false}>
+            {!isCollapsed && (
+              <motion.button
+                type="button"
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -8 }}
+                transition={{ duration: 0.2 }}
+                onClick={() => onNavigateTo('landing')}
+                className="flex items-center gap-2 overflow-hidden whitespace-nowrap cursor-pointer"
+                title="Sourcefinch — back to overview"
+              >
+                <div className="w-7 h-7 rounded-lg bg-teal-500 flex items-center justify-center text-white shadow-xs shrink-0">
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <span className="text-[15px] font-semibold tracking-tight text-zinc-900 dark:text-white font-sans-ui">
+                  Sourcefinch
+                </span>
+              </motion.button>
+            )}
+          </AnimatePresence>
+          {isCollapsed && (
+            <button
+              type="button"
+              onClick={() => onNavigateTo('landing')}
+              title="Sourcefinch — back to overview"
+              className="w-9 h-9 mx-auto rounded-lg bg-teal-500 flex items-center justify-center text-white shadow-xs cursor-pointer hover:bg-teal-600 transition-colors"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </button>
+          )}
+
+          {!isCollapsed && (
+            <button
+              type="button"
+              onClick={() => setIsCollapsed(true)}
+              className="p-1 rounded-md text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/60 transition-colors duration-100 cursor-pointer shrink-0"
+              title="Collapse sidebar"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* When collapsed, expose the expand toggle on its own row. */}
+        {isCollapsed && (
+          <div className="px-3 -mt-1">
+            <button
+              type="button"
+              onClick={() => setIsCollapsed(false)}
+              className="w-9 h-8 mx-auto rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/60 transition-colors duration-100 cursor-pointer"
+              title="Expand sidebar"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* ── Top-level nav (Overview, Workspace, Docs) ─────────────────── */}
+        <div className={`px-2 ${isCollapsed ? 'py-1' : 'pt-1 pb-2'} space-y-0.5`}>
+          <NavItem
+            icon={Home}
+            label="Overview"
+            isActive={activeTab === 'landing'}
+            onClick={() => onNavigateTo('landing')}
+            title="Overview"
+          />
+          <NavItem
+            icon={MessageSquare}
+            label="Workspace"
+            isActive={activeTab === 'workspace'}
+            onClick={() => onNavigateTo('workspace')}
+            title="Workspace"
+          />
+          <NavItem icon={BookOpen} label="Docs" onClick={onOpenDocs} title="Docs" />
+        </div>
+
+        {/* ── Repositories section header + add button ─────────────────── */}
+        <div className="px-3 pt-2 pb-1 flex items-center justify-between">
           <AnimatePresence initial={false}>
             {!isCollapsed && (
               <motion.div
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -10 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
                 className="flex items-center gap-2 overflow-hidden whitespace-nowrap"
               >
@@ -172,46 +313,29 @@ export default function Sidebar({
             )}
           </AnimatePresence>
 
-          <div className="flex items-center gap-1.5 ml-auto">
-            {/* Add Repo Button */}
-            {!isCollapsed ? (
-              <motion.button
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                type="button"
-                onClick={() => setIsModalOpen(true)}
-                className="flex items-center gap-1.5 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 px-2.5 py-1 text-[11.5px] font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-all cursor-pointer shadow-xs font-sans-ui whitespace-nowrap"
-                title="Add a new GitHub repository"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Repo</span>
-              </motion.button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(true)}
-                className="p-1.5 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-all cursor-pointer shadow-xs"
-                title="Add GitHub repository"
-              >
-                <Plus className="w-3.5 h-3.5" />
-              </button>
-            )}
-
-            {/* Minimal Collapse / Expand Slider Toggle */}
+          {!isCollapsed ? (
+            <motion.button
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 px-2.5 py-1 text-[11.5px] font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors duration-100 cursor-pointer shadow-xs font-sans-ui whitespace-nowrap"
+              title="Add a new GitHub repository"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Repo</span>
+            </motion.button>
+          ) : (
             <button
               type="button"
-              onClick={() => setIsCollapsed(!isCollapsed)}
-              className="p-1 rounded-md text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/60 transition-all cursor-pointer shrink-0"
-              title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              onClick={() => setIsModalOpen(true)}
+              className="p-1.5 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors duration-100 cursor-pointer shadow-xs mx-auto"
+              title="Add GitHub repository"
             >
-              {isCollapsed ? (
-                <ChevronRight className="w-3.5 h-3.5" />
-              ) : (
-                <ChevronLeft className="w-3.5 h-3.5" />
-              )}
+              <Plus className="w-3.5 h-3.5" />
             </button>
-          </div>
+          )}
         </div>
 
         {/* ── Search Input (Expanded only) ──────────────────────────── */}
@@ -222,7 +346,7 @@ export default function Sidebar({
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.2 }}
-              className="p-3 border-b border-zinc-200/60 dark:border-zinc-800/50 overflow-hidden"
+              className="p-3 overflow-hidden"
             >
               <div className="relative">
                 <input
@@ -230,7 +354,7 @@ export default function Sidebar({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search repositories..."
-                  className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 px-3 py-1.5 pl-8 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-zinc-400 dark:focus:border-zinc-700 focus:outline-none transition-all font-sans-ui shadow-2xs"
+                  className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 px-3 py-1.5 pl-8 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-zinc-400 dark:focus:border-zinc-700 focus:outline-none transition-colors duration-100 font-sans-ui shadow-2xs"
                 />
                 <Search className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500" />
               </div>
@@ -238,109 +362,99 @@ export default function Sidebar({
           )}
         </AnimatePresence>
 
-        {/* ── Repository List ───────────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+        {/* ── Repository List ──────────────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-1">
           {isLoading ? (
-            <div className="p-4 text-center text-xs text-zinc-500 font-sans-ui animate-subtle-pulse">
-              {!isCollapsed && 'Loading repositories...'}
+            <div className="p-3 space-y-2">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="h-12 rounded-[var(--radius-md)] bg-zinc-100/70 dark:bg-zinc-800/40 animate-pulse"
+                />
+              ))}
             </div>
           ) : filteredRepos.length === 0 ? (
-            !isCollapsed && (
-              <div className="p-4 text-center">
-                <p className="text-xs text-zinc-500 font-sans-ui">
-                  {searchQuery ? 'No matching repositories.' : 'No repositories yet.'}
-                </p>
-              </div>
-            )
+            <div className="p-4 text-center text-[11px] text-zinc-500 dark:text-zinc-400 font-sans-ui">
+              {searchQuery
+                ? 'No repositories match your search.'
+                : 'No repositories yet. Click + Add Repo to ingest one.'}
+            </div>
           ) : (
             filteredRepos.map((repo) => {
-              const isSelected = repo.id === selectedRepoId;
-
-              if (isCollapsed) {
-                // Collapsed icon-only rail item with tooltip
-                return (
-                  <button
-                    key={repo.id}
-                    type="button"
-                    onClick={() => onSelectRepo(repo.id)}
-                    className={`relative w-full p-2.5 rounded-xl flex items-center justify-center transition-all cursor-pointer group ${
-                      isSelected
-                        ? 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-xs'
-                        : 'border border-transparent hover:bg-white/80 dark:hover:bg-zinc-900/50 hover:border-zinc-200/60 dark:hover:border-zinc-800/80 text-zinc-500 hover:text-zinc-900 dark:hover:text-white'
-                    }`}
-                    title={`${repo.name} (${repo.branch || 'main'})`}
-                  >
-                    <FolderGit2
-                      className={`w-4 h-4 ${
-                        isSelected
-                          ? 'text-zinc-900 dark:text-white'
-                          : 'text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white'
-                      }`}
-                    />
-                    {isSelected && (
-                      <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-zinc-700 dark:bg-zinc-300" />
-                    )}
-                  </button>
-                );
-              }
-
-              // Expanded full repository card
+              const isSelected = selectedRepoId === repo.id;
               return (
                 <div
                   key={repo.id}
-                  onClick={() => onSelectRepo(repo.id)}
-                  className={`group relative w-full text-left rounded-xl p-3 transition-all cursor-pointer flex flex-col gap-1.5 ${
+                  className={`group relative rounded-[var(--radius-md)] p-2.5 flex items-center gap-2 cursor-pointer transition-colors duration-100 ${
                     isSelected
-                      ? 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-xs ring-1 ring-zinc-400/20 dark:ring-zinc-600/20'
-                      : 'border border-transparent hover:bg-white/80 dark:hover:bg-zinc-900/50 hover:border-zinc-200/60 dark:hover:border-zinc-800/80'
+                      ? 'bg-zinc-100 dark:bg-zinc-800/80'
+                      : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/40'
                   }`}
+                  onClick={() => onSelectRepo(repo.id)}
                 >
-                  {/* Top row: Dominant Repository Name + Actions */}
-                  <div className="flex items-center justify-between gap-2">
-                    <span
-                      className={`text-[13px] font-semibold truncate tracking-tight font-sans-ui ${
-                        isSelected
-                          ? 'text-zinc-900 dark:text-white'
-                          : 'text-zinc-700 dark:text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-white'
-                      }`}
-                    >
-                      {repo.owner ? `${repo.owner} / ${repo.name}` : repo.name}
-                    </span>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {/* Delete button on hover */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setRepoToDelete(repo);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 p-1 text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-md transition-all cursor-pointer"
-                        title={`Remove ${repo.name}`}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                  <div
+                    className={`w-7 h-7 rounded-[var(--radius-sm)] flex items-center justify-center shrink-0 ${
+                      isSelected
+                        ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-950'
+                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300'
+                    }`}
+                  >
+                    <FolderGit2 className="w-3.5 h-3.5" />
                   </div>
-
-                  {/* Subline: Branch, File Count & Subtle Ready Status */}
-                  <div className="flex items-center justify-between text-[11.5px] text-zinc-500 dark:text-zinc-400 font-sans-ui">
-                    <div className="flex items-center gap-1.5 font-code">
-                      <span className="truncate">{repo.branch || 'main'}</span>
-                      <span className="text-zinc-300 dark:text-zinc-700">·</span>
-                      <span>{repo.file_count || 0} files</span>
+                  {!isCollapsed && (
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[12.5px] font-semibold text-zinc-900 dark:text-white truncate font-sans-ui">
+                          {repo.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setRepoToDelete(repo);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-md transition-colors duration-100 cursor-pointer"
+                          title="Remove repository"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-between mt-0.5 text-[10.5px] text-zinc-500 dark:text-zinc-400 font-code">
+                        <span className="truncate">{repo.branch || 'main'}</span>
+                        <StatusDot
+                          status={repo.status === 'completed' ? 'online' : 'muted'}
+                          label={
+                            repo.status === 'completed'
+                              ? 'Ready'
+                              : (repo.status || 'Pending')
+                          }
+                          className="text-[10.5px] !gap-1"
+                        />
+                      </div>
                     </div>
-
-                    <StatusDot
-                      status={repo.status === 'completed' ? 'online' : 'muted'}
-                      label={repo.status === 'completed' ? 'Ready' : (repo.status || 'Pending')}
-                      className="text-[11px]"
-                    />
-                  </div>
+                  )}
                 </div>
               );
             })
           )}
+        </div>
+
+        {/* ── Footer: user (avatar + name + menu) ────────────────────────── */}
+        <div
+          className={`border-t border-zinc-200/60 dark:border-zinc-800/60 px-2 ${
+            isCollapsed ? 'py-2' : 'py-2.5'
+          }`}
+        >
+          <SidebarUserRow
+            collapsed={isCollapsed}
+            isSignedIn={isSignedIn}
+            userLoaded={userLoaded}
+            imageUrl={user?.imageUrl}
+            firstName={user?.firstName}
+            lastName={user?.lastName}
+            username={user?.username}
+            primaryEmail={user?.primaryEmailAddress?.emailAddress}
+          />
         </div>
       </motion.aside>
 
@@ -390,43 +504,92 @@ export default function Sidebar({
                 </div>
               </div>
 
-              {/* Search */}
-              <div className="p-3 border-b border-zinc-200/60 dark:border-zinc-800/50">
+              <div className="p-3">
                 <div className="relative">
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search repositories..."
-                    className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-1.5 pl-8 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none"
+                    className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 px-3 py-1.5 pl-8 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-zinc-400 dark:focus:border-zinc-700 focus:outline-none transition-colors duration-100 font-sans-ui shadow-2xs"
                   />
-                  <Search className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-zinc-400" />
+                  <Search className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500" />
                 </div>
               </div>
 
-              {/* Mobile Repo List */}
-              <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                {filteredRepos.map((repo) => (
-                  <div
-                    key={repo.id}
+              <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-1">
+                {/* Mobile nav quick links */}
+                <div className="px-1.5 py-1 space-y-0.5">
+                  <button
+                    type="button"
                     onClick={() => {
-                      onSelectRepo(repo.id);
-                      if (onCloseMobile) onCloseMobile();
+                      onNavigateTo('landing');
+                      onCloseMobile?.();
                     }}
-                    className={`w-full rounded-xl p-3 text-left border ${
-                      repo.id === selectedRepoId
-                        ? 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700'
-                        : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900'
-                    }`}
+                    className="w-full flex items-center gap-2 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-[12px] font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors duration-100"
                   >
-                    <div className="font-semibold text-sm text-zinc-900 dark:text-white truncate">
-                      {repo.name}
+                    <Home className="w-3.5 h-3.5" />
+                    Overview
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onNavigateTo('workspace');
+                      onCloseMobile?.();
+                    }}
+                    className="w-full flex items-center gap-2 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-[12px] font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors duration-100"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    Workspace
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenDocs();
+                      onCloseMobile?.();
+                    }}
+                    className="w-full flex items-center gap-2 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-[12px] font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors duration-100"
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    Docs
+                  </button>
+                </div>
+
+                {filteredRepos.map((repo) => {
+                  const isSelected = selectedRepoId === repo.id;
+                  return (
+                    <div
+                      key={repo.id}
+                      className={`rounded-[var(--radius-md)] p-2.5 flex items-center gap-2 cursor-pointer transition-colors duration-100 ${
+                        isSelected
+                          ? 'bg-zinc-100 dark:bg-zinc-800/80'
+                          : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/40'
+                      }`}
+                      onClick={() => {
+                        onSelectRepo(repo.id);
+                        onCloseMobile?.();
+                      }}
+                    >
+                      <div
+                        className={`w-7 h-7 rounded-[var(--radius-sm)] flex items-center justify-center shrink-0 ${
+                          isSelected
+                            ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-950'
+                            : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300'
+                        }`}
+                      >
+                        <FolderGit2 className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm text-zinc-900 dark:text-white truncate">
+                          {repo.name}
+                        </div>
+                        <div className="text-xs text-zinc-500 font-code mt-1">
+                          {repo.branch || 'main'} · {repo.file_count || 0} files
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-xs text-zinc-500 font-code mt-1">
-                      {repo.branch || 'main'} · {repo.file_count || 0} files
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </motion.aside>
           </>
@@ -482,19 +645,19 @@ export default function Sidebar({
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+          <div className="flex items-center justify-end gap-2.5 pt-4">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
               disabled={isSubmitting}
-              className="rounded-[var(--radius-sm)] border border-zinc-200 dark:border-zinc-800 px-4 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-40 font-sans-ui"
+              className="rounded-[var(--radius-sm)] border border-zinc-200 dark:border-zinc-800 px-4 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors duration-100 disabled:opacity-40 font-sans-ui"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting || !githubUrl.trim()}
-              className="rounded-[var(--radius-sm)] bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 px-4 py-2 text-xs font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors shadow-xs disabled:opacity-40 font-sans-ui"
+              className="rounded-[var(--radius-sm)] bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 px-4 py-2 text-xs font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors duration-100 shadow-xs disabled:opacity-40 font-sans-ui"
             >
               {isSubmitting ? 'Submitting...' : 'Ingest Repository'}
             </button>
@@ -538,7 +701,7 @@ export default function Sidebar({
             type="button"
             onClick={() => !isDeleting && setRepoToDelete(null)}
             disabled={isDeleting}
-            className="rounded-[var(--radius-sm)] border border-zinc-200 dark:border-zinc-800 px-3.5 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-40 font-sans-ui"
+            className="rounded-[var(--radius-sm)] border border-zinc-200 dark:border-zinc-800 px-3.5 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors duration-100 disabled:opacity-40 font-sans-ui"
           >
             Cancel
           </button>
@@ -546,14 +709,14 @@ export default function Sidebar({
             type="button"
             onClick={handleConfirmDelete}
             disabled={isDeleting}
-            className="rounded-[var(--radius-sm)] bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-1.5 text-xs font-semibold transition-colors shadow-xs disabled:opacity-40 font-sans-ui"
+            className="rounded-[var(--radius-sm)] bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-1.5 text-xs font-semibold transition-colors duration-100 shadow-xs disabled:opacity-40 font-sans-ui"
           >
             {isDeleting ? 'Removing...' : 'Delete Repository'}
           </button>
         </div>
       </Modal>
 
-      {/* ── Fullscreen Ingestion Modal (GSAP Smooth Progress) ─────────── */}
+      {/* ── Fullscreen Ingestion Modal (Smooth Progress) ─────────── */}
       {isSubmitting && (
         <RepoIngestionLoader
           repoName={githubUrl}
@@ -561,5 +724,139 @@ export default function Sidebar({
         />
       )}
     </>
+  );
+}
+
+// ── Sidebar user row (avatar + name + menu) ─────────────────────────────
+/**
+ * Renders the user identity strip at the bottom of the sidebar:
+ *   [avatar] [name] [chevron/...]   ←  whole row opens Clerk user menu
+ *
+ * - Signed in: shows user image + name. Clicking the row opens the
+ *   Clerk user menu (sign-out, profile, etc.) via the inline <UserButton/>.
+ * - Signed out: shows a "Sign in" prompt via Clerk's <SignInButton/>.
+ * - Collapsed mode: collapses to a 32px avatar circle only.
+ */
+function SidebarUserRow({
+  collapsed,
+  isSignedIn,
+  userLoaded,
+  imageUrl,
+  firstName,
+  lastName,
+  username,
+  primaryEmail,
+}: {
+  collapsed: boolean;
+  isSignedIn: boolean | undefined;
+  userLoaded: boolean;
+  imageUrl?: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  username?: string | null;
+  primaryEmail?: string | null;
+}) {
+  // Compose a friendly display name.  Falls back gracefully so the
+  // row never shows "undefined" / "null" when claims are partial.
+  const displayName =
+    [firstName, lastName].filter(Boolean).join(' ').trim() ||
+    username ||
+    primaryEmail?.split('@')[0] ||
+    'Signed in';
+
+  const initials =
+    [firstName?.[0], lastName?.[0]]
+      .filter(Boolean)
+      .join('')
+      .toUpperCase() ||
+    (primaryEmail?.[0] ?? '?').toUpperCase();
+
+  if (collapsed) {
+    return (
+      <div className="flex justify-center">
+        {isSignedIn ? (
+          <UserButton
+            afterSignOutUrl="/"
+            appearance={{
+              elements: { avatarBox: 'h-8 w-8' },
+            }}
+          />
+        ) : (
+          <SignInButton mode="modal" forceRedirectUrl="/workspace">
+            <button
+              type="button"
+              title="Sign in"
+              className="h-8 w-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors duration-100 cursor-pointer"
+            >
+              {initials}
+            </button>
+          </SignInButton>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      {isSignedIn ? (
+        <UserButton
+          afterSignOutUrl="/"
+          appearance={{
+            elements: {
+              // Hide Clerk's default avatar box — our custom row is the visual.
+              userButtonBox: 'hidden',
+              userButtonOuterBox: 'hidden',
+            },
+          }}
+        >
+          <button
+            type="button"
+            className="w-full flex items-center gap-2.5 rounded-[var(--radius-sm)] px-2 py-1.5 text-left transition-colors duration-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 cursor-pointer"
+            aria-label="Open account menu"
+          >
+            {imageUrl ? (
+              <img
+                src={imageUrl}
+                alt={displayName}
+                className="h-7 w-7 rounded-full object-cover ring-1 ring-zinc-200 dark:ring-zinc-800 shrink-0"
+              />
+            ) : (
+              <div className="h-7 w-7 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 flex items-center justify-center text-[11px] font-semibold shrink-0">
+                {initials}
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="text-[12px] font-semibold text-zinc-900 dark:text-white truncate font-sans-ui">
+                {userLoaded ? displayName : '…'}
+              </div>
+              {primaryEmail && (
+                <div className="text-[10.5px] text-zinc-500 dark:text-zinc-400 truncate font-sans-ui">
+                  {primaryEmail}
+                </div>
+              )}
+            </div>
+          </button>
+        </UserButton>
+      ) : (
+        <SignInButton mode="modal" forceRedirectUrl="/workspace">
+          <button
+            type="button"
+            className="w-full flex items-center gap-2.5 rounded-[var(--radius-sm)] px-2 py-1.5 text-left transition-colors duration-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 cursor-pointer"
+          >
+            <div className="h-7 w-7 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 shrink-0">
+              {initials}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[12px] font-semibold text-zinc-900 dark:text-white truncate font-sans-ui">
+                {userLoaded ? 'Sign in' : '…'}
+              </div>
+              <div className="text-[10.5px] text-zinc-500 dark:text-zinc-400 truncate font-sans-ui">
+                Continue to workspace
+              </div>
+            </div>
+          </button>
+        </SignInButton>
+      )}
+    </div>
   );
 }
