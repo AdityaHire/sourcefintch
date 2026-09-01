@@ -4,6 +4,8 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { Repository } from '../types';
 import { useApiClient } from '../services/useApiClient';
+import { StatusDot } from './ui/StatusDot';
+import { Modal } from './ui/Modal';
 import { RepoIngestionLoader } from '@/components/ui/repo-ingestion-loader';
 import {
   Plus,
@@ -145,14 +147,9 @@ export default function Sidebar({
     <>
       {/* ── Desktop Animated Collapsible Sidebar ──────────────────────── */}
       <motion.aside
-        animate={{
-          width: isCollapsed ? 64 : 290,
-        }}
-        transition={{
-          duration: 0.3,
-          ease: [0.25, 1, 0.5, 1],
-        }}
-        className={`relative hidden md:flex flex-col border-r border-zinc-200/80 dark:border-zinc-800/60 bg-white/40 dark:bg-[#0a0a0c]/50 backdrop-blur-md z-20 shrink-0 select-none overflow-hidden h-full`}
+        animate={{ width: isCollapsed ? 64 : 290 }}
+        transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+        className={`relative hidden md:flex flex-col border-r border-zinc-200/80 dark:border-zinc-800/60 bg-white/40 dark:bg-zinc-950/40 backdrop-blur-md z-20 shrink-0 select-none overflow-hidden h-full`}
       >
         {/* ── Top Header Bar ────────────────────────────────────────── */}
         <div className="flex items-center justify-between border-b border-zinc-200/80 dark:border-zinc-800/60 px-3 py-3 bg-white/40 dark:bg-transparent min-h-[49px]">
@@ -334,10 +331,11 @@ export default function Sidebar({
                       <span>{repo.file_count || 0} files</span>
                     </div>
 
-                    <div className="flex items-center gap-1 text-[11px] text-zinc-600 dark:text-zinc-400 font-medium">
-                      <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 dark:bg-zinc-400 inline-block" />
-                      <span>Ready</span>
-                    </div>
+                    <StatusDot
+                      status={repo.status === 'completed' ? 'online' : 'muted'}
+                      label={repo.status === 'completed' ? 'Ready' : (repo.status || 'Pending')}
+                      className="text-[11px]"
+                    />
                   </div>
                 </div>
               );
@@ -362,7 +360,7 @@ export default function Sidebar({
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ duration: 0.25, ease: 'easeOut' }}
-              className="fixed inset-y-0 left-0 w-80 shadow-2xl bg-white dark:bg-[#0a0a0c] z-40 md:hidden flex flex-col border-r border-zinc-200 dark:border-zinc-800"
+              className="fixed inset-y-0 left-0 w-80 shadow-2xl bg-white dark:bg-zinc-950 z-40 md:hidden flex flex-col border-r border-zinc-200 dark:border-zinc-800"
             >
               <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 px-4 py-3">
                 <div className="flex items-center gap-2">
@@ -436,133 +434,124 @@ export default function Sidebar({
       </AnimatePresence>
 
       {/* ── Add Repository Modal ──────────────────────────────────────── */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-2xl">
-            <div className="flex items-center justify-between mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-700 dark:text-zinc-300">
-                  <FolderGit2 className="w-3.5 h-3.5" />
-                </div>
-                <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Add GitHub Repository</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => !isSubmitting && setIsModalOpen(false)}
-                disabled={isSubmitting}
-                className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 p-1 text-sm rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-40"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleAddRepo} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5 font-sans-ui">
-                  GitHub Repository URL <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="https://github.com/owner/repository"
-                  value={githubUrl}
-                  onChange={(e) => setGithubUrl(e.target.value)}
-                  disabled={isSubmitting}
-                  className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 px-3.5 py-2 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:border-zinc-400 focus:bg-white dark:focus:bg-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-400/40 font-sans-ui"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5 font-sans-ui">
-                  Branch <span className="text-zinc-400 font-normal">(optional, default: default branch)</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="main, master, etc."
-                  value={branch}
-                  onChange={(e) => setBranch(e.target.value)}
-                  disabled={isSubmitting}
-                  className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 px-3.5 py-2 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:border-zinc-400 focus:bg-white dark:focus:bg-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-400/40 font-sans-ui"
-                />
-              </div>
-
-              {errorMessage && (
-                <div className="rounded-xl bg-rose-500/10 border border-rose-500/20 p-3 text-xs text-rose-600 dark:text-rose-400 font-sans-ui">
-                  {errorMessage}
-                </div>
-              )}
-
-              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-zinc-100 dark:border-zinc-800">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  disabled={isSubmitting}
-                  className="rounded-xl border border-zinc-200 dark:border-zinc-800 px-4 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all disabled:opacity-40 font-sans-ui"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting || !githubUrl.trim()}
-                  className="rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 px-4 py-2 text-xs font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-all shadow-xs disabled:opacity-40 font-sans-ui"
-                >
-                  {isSubmitting ? 'Submitting...' : 'Ingest Repository'}
-                </button>
-              </div>
-            </form>
+      <Modal
+        open={isModalOpen}
+        onClose={() => !isSubmitting && setIsModalOpen(false)}
+        size="md"
+      >
+        <div className="flex items-center gap-2 mb-4 -mt-2">
+          <div className="w-6 h-6 rounded-[var(--radius-sm)] bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-700 dark:text-zinc-300">
+            <FolderGit2 className="w-3.5 h-3.5" />
           </div>
+          <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Add GitHub Repository</h3>
         </div>
-      )}
+
+        <form onSubmit={handleAddRepo} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5 font-sans-ui">
+              GitHub Repository URL <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="https://github.com/owner/repository"
+              value={githubUrl}
+              onChange={(e) => setGithubUrl(e.target.value)}
+              disabled={isSubmitting}
+              className="w-full rounded-[var(--radius-sm)] border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 px-3.5 py-2 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:border-zinc-400 focus:bg-white dark:focus:bg-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-400/40 font-sans-ui transition-colors duration-100"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5 font-sans-ui">
+              Branch <span className="text-zinc-400 font-normal">(optional, default: default branch)</span>
+            </label>
+            <input
+              type="text"
+              placeholder="main, master, etc."
+              value={branch}
+              onChange={(e) => setBranch(e.target.value)}
+              disabled={isSubmitting}
+              className="w-full rounded-[var(--radius-sm)] border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 px-3.5 py-2 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:border-zinc-400 focus:bg-white dark:focus:bg-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-400/40 font-sans-ui transition-colors duration-100"
+            />
+          </div>
+
+          {errorMessage && (
+            <div className="rounded-[var(--radius-sm)] bg-rose-500/10 border border-rose-500/20 p-3 text-xs text-rose-600 dark:text-rose-400 font-sans-ui">
+              {errorMessage}
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              disabled={isSubmitting}
+              className="rounded-[var(--radius-sm)] border border-zinc-200 dark:border-zinc-800 px-4 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-40 font-sans-ui"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting || !githubUrl.trim()}
+              className="rounded-[var(--radius-sm)] bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 px-4 py-2 text-xs font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors shadow-xs disabled:opacity-40 font-sans-ui"
+            >
+              {isSubmitting ? 'Submitting...' : 'Ingest Repository'}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* ── Delete Confirmation Modal ─────────────────────────────────── */}
-      {repoToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="w-full max-w-sm rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-2xl font-sans-ui">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
-                <Trash2 className="w-4 h-4" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-zinc-900 dark:text-white">
-                  Remove Repository
-                </h3>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  This action cannot be undone.
-                </p>
-              </div>
-            </div>
+      <Modal
+        open={!!repoToDelete}
+        onClose={() => !isDeleting && setRepoToDelete(null)}
+        size="sm"
+        title={
+          <span className="flex items-center gap-2 text-sm font-semibold">
+            <span className="w-7 h-7 rounded-[var(--radius-sm)] bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-600 dark:text-rose-400">
+              <Trash2 className="w-3.5 h-3.5" />
+            </span>
+            Remove Repository
+          </span>
+        }
+      >
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
+          This action cannot be undone.
+        </p>
+        <p className="text-xs text-zinc-700 dark:text-zinc-300 mb-4 leading-relaxed">
+          Are you sure you want to remove{' '}
+          <span className="font-semibold text-zinc-900 dark:text-white">
+            {repoToDelete?.name}
+          </span>
+          ? All indexed chunks and metadata will be permanently deleted.
+        </p>
 
-            <p className="text-xs text-zinc-600 dark:text-zinc-300 mb-4 leading-relaxed">
-              Are you sure you want to remove <span className="font-semibold text-zinc-900 dark:text-white">{repoToDelete.name}</span> from Sourcefinch? All indexed chunks and metadata for this repository will be permanently deleted.
-            </p>
-
-            {deleteError && (
-              <div className="rounded-xl bg-rose-500/10 border border-rose-500/20 p-2.5 text-xs text-rose-600 dark:text-rose-400 mb-4">
-                {deleteError}
-              </div>
-            )}
-
-            <div className="flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => !isDeleting && setRepoToDelete(null)}
-                disabled={isDeleting}
-                className="rounded-xl border border-zinc-200 dark:border-zinc-800 px-3.5 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all disabled:opacity-40"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDelete}
-                disabled={isDeleting}
-                className="rounded-xl bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-1.5 text-xs font-semibold transition-all shadow-xs disabled:opacity-40"
-              >
-                {isDeleting ? 'Removing...' : 'Delete Repository'}
-              </button>
-            </div>
+        {deleteError && (
+          <div className="rounded-[var(--radius-sm)] bg-rose-500/10 border border-rose-500/20 p-2.5 text-xs text-rose-600 dark:text-rose-400 mb-4">
+            {deleteError}
           </div>
+        )}
+
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => !isDeleting && setRepoToDelete(null)}
+            disabled={isDeleting}
+            className="rounded-[var(--radius-sm)] border border-zinc-200 dark:border-zinc-800 px-3.5 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-40 font-sans-ui"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirmDelete}
+            disabled={isDeleting}
+            className="rounded-[var(--radius-sm)] bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-1.5 text-xs font-semibold transition-colors shadow-xs disabled:opacity-40 font-sans-ui"
+          >
+            {isDeleting ? 'Removing...' : 'Delete Repository'}
+          </button>
         </div>
-      )}
+      </Modal>
 
       {/* ── Fullscreen Ingestion Modal (GSAP Smooth Progress) ─────────── */}
       {isSubmitting && (

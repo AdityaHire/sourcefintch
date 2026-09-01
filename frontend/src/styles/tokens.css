@@ -1,0 +1,72 @@
+/**
+ * Sourcefinch design tokens — the single source of truth for radii,
+ * status colors, and shared animation timings.  Imported globally via
+ * index.css.  Components reach for these tokens instead of inventing
+ * one-off values.
+ *
+ * ── RADIUS SCALE ──
+ *   xs: 6px   — pills, tiny badges
+ *   sm: 8px   — buttons, inputs
+ *   md: 10px  — cards, suggestion tiles
+ *   lg: 14px  — modal panels, code blocks
+ *   xl: 18px  — composer, hero containers
+ *
+ * ── STATUS COLORS ──
+ *   status-online       → emerald-500
+ *   status-checking     → amber-400
+ *   status-failed       → rose-500
+ *   status-muted        → zinc-500/400
+ *
+ * ── TRANSITION DURATIONS ──
+ *   100ms hover/active
+ *   150ms panel/collapse
+ *   200ms modal
+ *   250ms route
+ */
+
+:root {
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+
+  --duration-hover: 100ms;
+  --duration-panel: 150ms;
+  --duration-modal: 200ms;
+  --duration-route: 250ms;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ── Global transition discipline ──────────────────────── */
+/* Buttons, inputs, and badges should NOT animate layout
+   properties.  Apply hover via color/background/border. */
+@layer base {
+  button,
+  a,
+  [role='button'] {
+    transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+    transition-duration: var(--duration-hover);
+    transition-timing-function: var(--ease-out);
+  }
+}
+
+/* ── Soft scale on press for primary actions ───────────── */
+.press-scale:active {
+  transform: scale(0.97);
+}
+
+/* ── Status pill helpers (single source of truth) ──────── */
+.status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  transition: background-color var(--duration-hover) var(--ease-out);
+}
+.status-dot--online   { background: rgb(16 185 129); }
+.status-dot--checking { background: rgb(251 191 36); animation: subtlePulse 1.6s ease-in-out infinite; }
+.status-dot--failed   { background: rgb(244 63 94); }
+.status-dot--muted    { background: rgb(113 113 122); }
+html.dark .status-dot--muted { background: rgb(161 161 170); }

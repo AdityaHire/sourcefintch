@@ -2,6 +2,7 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 @import "./styles/fonts.css";
+@import "./styles/tokens.css";
 
 /*
  * Sourcefinch Design System & Global Styles

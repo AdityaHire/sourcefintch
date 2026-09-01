@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import Sidebar from './Sidebar';
 import CodeViewer from './CodeViewer';
 import MarkdownRenderer from './MarkdownRenderer';
 import { ThinkingTool } from '@/components/ui/thinking-tool';
+import { Banner } from './ui/Banner';
+import { Skeleton } from './ui/Skeleton';
+import { StatusDot } from './ui/StatusDot';
 import { useApiClient } from '../services/useApiClient';
 import type {
   Repository,
@@ -150,7 +154,7 @@ export default function ChatInterface() {
     window.history.pushState(null, '', url.pathname + url.search);
 
     try {
-      const newConv = await createConversation(selectedRepoId);
+      const newConv = await api.createConversation(selectedRepoId);
       setConversationId(newConv.id);
       const url = new URL(window.location.href);
       url.searchParams.set('conversationId', String(newConv.id));
@@ -316,7 +320,7 @@ export default function ChatInterface() {
       {/* ── 2. CENTER PANEL: Chat Workspace ───────────────────────────────── */}
       <div className="relative flex flex-1 flex-col h-full min-w-0 overflow-hidden bg-white/20 dark:bg-transparent">
         {/* ── Top Repository Bar ──────────────────────────────────────────── */}
-        <div className="flex items-center justify-between border-b border-zinc-200/80 dark:border-zinc-800/60 bg-white/50 dark:bg-[#0c0c0e]/50 px-4 sm:px-6 py-2.5 shrink-0 backdrop-blur-md z-10">
+        <div className="flex items-center justify-between border-b border-zinc-200/80 dark:border-zinc-800/60 bg-white/50 dark:bg-zinc-950/50 px-4 sm:px-6 py-2.5 shrink-0 backdrop-blur-md z-10">
           {/* Left: Dominant repo name + branch & indexed status */}
           <div className="flex items-center gap-3 min-w-0">
             <button
@@ -342,8 +346,7 @@ export default function ChatInterface() {
                   <span>{activeRepo.file_count || 0} files</span>
                   <span>·</span>
                   <span className="flex items-center gap-1 text-zinc-600 dark:text-zinc-400 font-medium">
-                    <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 dark:bg-zinc-400 inline-block" />
-                    Indexed
+                    <StatusDot status="online" label="Indexed" className="text-[12px]" />
                   </span>
                 </div>
               )}
@@ -391,38 +394,23 @@ export default function ChatInterface() {
         </div>
 
         {/* Error Banner */}
-        {errorMessage && (
-          <div className="flex items-center justify-between border-b border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/[0.06] px-4 sm:px-6 py-2.5 text-xs text-rose-900 dark:text-rose-200 shrink-0 font-sans-ui">
-            <span>{errorMessage}</span>
-            <button
-              type="button"
-              onClick={() => setErrorMessage(null)}
-              className="text-rose-500 hover:text-rose-700 dark:hover:text-rose-100 cursor-pointer ml-3 font-semibold"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
+        <Banner show={!!errorMessage} tone="error" onDismiss={() => setErrorMessage(null)}>
+          {errorMessage}
+        </Banner>
 
         {/* Persistence Warning Banner */}
-        {persistenceWarning && (
-          <div className="flex items-center justify-between border-b border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/[0.06] px-4 sm:px-6 py-2.5 text-xs text-amber-900 dark:text-amber-200 shrink-0 font-sans-ui">
-            <span>Response shown, but could not be saved to history due to a storage issue.</span>
-            <button
-              type="button"
-              onClick={() => setPersistenceWarning(false)}
-              className="text-amber-500 hover:text-amber-700 dark:hover:text-amber-100 cursor-pointer ml-3 font-semibold"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
+        <Banner show={persistenceWarning} tone="warning" onDismiss={() => setPersistenceWarning(false)}>
+          Response shown, but could not be saved to history due to a storage issue.
+        </Banner>
 
         {/* ── Scrollable Conversation Stream ───────────────────────────────── */}
         <div className="relative z-1 flex-1 overflow-y-auto px-4 sm:px-8 py-5 select-text">
           {isLoadingConv ? (
-            <div className="flex h-full items-center justify-center text-zinc-400 text-xs font-sans-ui animate-subtle-pulse">
-              Loading conversation history...
+            <div className="space-y-4 max-w-3xl mx-auto w-full px-2">
+              <Skeleton className="h-6 w-2/3" />
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-6 w-1/2" />
+              <Skeleton className="h-32 w-full" />
             </div>
           ) : messages.length === 0 ? (
             /* ── Empty State with Suggested Starters ───────────────────────── */
@@ -468,8 +456,11 @@ export default function ChatInterface() {
               {messages.map((msg, index) => {
                 const isUser = msg.role === 'user';
                 return (
-                  <div
+                  <motion.div
                     key={index}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
                     className={`flex flex-col ${
                       index > 0 && !isUser ? 'pt-4 border-t border-zinc-100 dark:border-zinc-900/80' : ''
                     }`}
@@ -569,7 +560,7 @@ export default function ChatInterface() {
                         )}
                       </div>
                     )}
-                  </div>
+                  </motion.div>
                 );
               })}
 
@@ -590,7 +581,7 @@ export default function ChatInterface() {
         </div>
 
         {/* ── 3. Bottom Composer: Elevated, Anchored, Professional ─────────── */}
-        <div className="relative z-10 border-t border-zinc-200/80 dark:border-zinc-800/60 bg-white/60 dark:bg-[#0c0c0e]/60 p-3 sm:p-4 shrink-0 backdrop-blur-md">
+        <div className="relative z-10 border-t border-zinc-200/80 dark:border-zinc-800/60 bg-white/60 dark:bg-zinc-950/60 p-3 sm:p-4 shrink-0 backdrop-blur-md">
           <div className="max-w-3xl mx-auto w-full">
             <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="relative font-sans-ui">
               <div className="flex items-center gap-2 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 px-3.5 py-2.5 shadow-md shadow-zinc-200/50 dark:shadow-black/30 focus-within:border-zinc-400 dark:focus-within:border-zinc-600 focus-within:ring-2 focus-within:ring-zinc-400/20 transition-all">
@@ -616,7 +607,7 @@ export default function ChatInterface() {
                   className={`h-7 w-7 rounded-lg flex items-center justify-center transition-all duration-200 shrink-0 ${
                     hasTextToSend && selectedRepoId && !isSubmitting
                       ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-200 cursor-pointer shadow-xs scale-100'
-                      : 'bg-zinc-100 dark:bg-zinc-850 text-zinc-400 dark:text-zinc-600 cursor-not-allowed opacity-50'
+                      : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed opacity-50'
                   }`}
                   title={hasTextToSend ? 'Send message (Enter)' : 'Enter message'}
                 >
@@ -635,15 +626,25 @@ export default function ChatInterface() {
       </div>
 
       {/* ── 3. FULLSCREEN CODE INSPECTOR OVERLAY ──────────────────────────── */}
-      {isCodeViewerOpen && (
-        <div className="absolute inset-0 w-full h-full z-30 flex flex-col bg-white/95 dark:bg-[#0c0c0e]/95 backdrop-blur-md animate-in fade-in duration-200">
-          <CodeViewer
-            citation={selectedCitation}
-            activeRepo={activeRepo}
-            onClose={() => setIsCodeViewerOpen(false)}
-          />
-        </div>
-      )}
+      <AnimatePresence>
+        {isCodeViewerOpen && (
+          <motion.div
+            key="code-viewer"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.99 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="absolute inset-0 w-full h-full z-30 flex flex-col bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md"
+            style={{ transformOrigin: 'center' }}
+          >
+            <CodeViewer
+              citation={selectedCitation}
+              activeRepo={activeRepo}
+              onClose={() => setIsCodeViewerOpen(false)}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

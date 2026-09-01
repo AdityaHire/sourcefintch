@@ -13,6 +13,8 @@ import LandingPageContent from '../components/LandingPageContent';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { ShaderBackground } from '@/components/ui/waves-shader';
 import { ValleyOfTheMindShader } from '@/components/ui/valley-of-the-mind';
+import { Modal } from '../components/ui/Modal';
+import { StatusDot } from '../components/ui/StatusDot';
 import { UserButton } from '@clerk/clerk-react';
 import { useApiClient } from '../services/useApiClient';
 import type { HealthResponse } from '../types';
@@ -109,7 +111,7 @@ export default function WorkspacePage() {
     <nav
       className={`h-16 w-full shrink-0 flex items-center justify-between px-6 sm:px-12 z-40 transition-colors backdrop-blur-md ${
         isWorkspace
-          ? 'border-b border-zinc-200/80 dark:border-zinc-800/60 bg-white/60 dark:bg-[#0a0a0c]/60'
+          ? 'border-b border-zinc-200/80 dark:border-zinc-800/60 bg-white/60 dark:bg-zinc-950/60'
           : 'bg-transparent border-none'
       }`}
     >
@@ -175,7 +177,7 @@ export default function WorkspacePage() {
   return (
     <div className="h-screen w-full bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans-ui selection:bg-indigo-500/20 dark:selection:bg-indigo-500/30 selection:text-indigo-900 dark:selection:text-white flex flex-col overflow-hidden">
       {activeTab === 'workspace' ? (
-        <div className="relative h-screen w-full flex flex-col overflow-hidden bg-gradient-to-br from-zinc-50/90 via-white/80 to-zinc-100/70 dark:from-[#09090b] dark:via-[#0c0c0e] dark:to-[#0a0a0d]">
+        <div className="relative h-screen w-full flex flex-col overflow-hidden bg-gradient-to-br from-zinc-50/90 via-white/80 to-zinc-100/70 dark:from-zinc-950 dark:via-zinc-950 dark:to-zinc-900">
           <div className="fixed inset-0 z-0 pointer-events-none opacity-40 dark:opacity-30 overflow-hidden">
             <ValleyOfTheMindShader className="h-full w-full" />
           </div>
@@ -203,133 +205,83 @@ export default function WorkspacePage() {
         </div>
       )}
 
-      {isHealthOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in font-sans-ui">
-          <div className="w-full max-w-lg rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-2xl">
-            <div className="flex items-center justify-between mb-5 border-b border-zinc-100 dark:border-zinc-800 pb-3">
-              <div className="flex items-center gap-2.5">
-                <span
-                  className={`h-2.5 w-2.5 rounded-full ${
-                    allServicesHealthy ? 'bg-emerald-500' : 'bg-amber-400'
-                  }`}
-                />
-                <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">System Services Status</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsHealthOpen(false)}
-                className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 cursor-pointer text-sm"
-              >
-                ✕
-              </button>
+      <Modal open={isHealthOpen} onClose={() => setIsHealthOpen(false)} size="lg" title="System Services Status">
+        <div className="flex items-center gap-2 mb-4 -mt-2">
+          <StatusDot
+            status={allServicesHealthy ? 'online' : 'checking'}
+            label={allServicesHealthy ? 'All services operational' : 'Some services are down'}
+          />
+        </div>
+        <div className="space-y-3.5">
+          <div className="rounded-[var(--radius-md)] border border-zinc-100 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/60 p-4">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-200">Backend API</span>
+              <StatusDot
+                status={backendHealth === 'online' ? 'online' : backendHealth === 'checking' ? 'checking' : 'failed'}
+                label={backendHealth}
+              />
             </div>
-            <div className="space-y-3.5">
-              <div className="rounded-xl border border-zinc-100 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/60 p-4">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-200">Backend API</span>
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 text-[10px] font-code uppercase tracking-wider ${
-                      backendHealth === 'online'
-                        ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-400'
-                        : 'bg-rose-100 dark:bg-rose-500/10 text-rose-800 dark:text-rose-400'
-                    }`}
-                  >
-                    {backendHealth}
-                  </span>
-                </div>
-                <p className="text-[11px] text-zinc-500 leading-relaxed mb-2 font-sans-ui">
-                  Node.js + Express (:3001) — REST API, MySQL migrations, and GitHub repository ingestion.
-                </p>
-                {backendDetails && (
-                  <pre className="rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-2 text-[10px] font-code text-zinc-700 dark:text-zinc-400 overflow-x-auto">
-                    {JSON.stringify(backendDetails, null, 2)}
-                  </pre>
-                )}
-              </div>
-              <div className="rounded-xl border border-zinc-100 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/60 p-4">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-200">AI Service</span>
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 text-[10px] font-code uppercase tracking-wider ${
-                      aiHealth === 'online'
-                        ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-400'
-                        : 'bg-rose-100 dark:bg-rose-500/10 text-rose-800 dark:text-rose-400'
-                    }`}
-                  >
-                    {aiHealth}
-                  </span>
-                </div>
-                <p className="text-[11px] text-zinc-500 leading-relaxed mb-2 font-sans-ui">
-                  Python + FastAPI (:8000) — AST chunking, embeddings, Qdrant vector retrieval, and LLM RAG engine.
-                </p>
-                {aiDetails && (
-                  <pre className="rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-2 text-[10px] font-code text-zinc-700 dark:text-zinc-400 overflow-x-auto">
-                    {JSON.stringify(aiDetails, null, 2)}
-                  </pre>
-                )}
-              </div>
+            <p className="text-[11px] text-zinc-500 leading-relaxed mb-2 font-sans-ui">
+              Node.js + Express (:3001) — REST API, MySQL migrations, and GitHub repository ingestion.
+            </p>
+            {backendDetails && (
+              <pre className="rounded-[var(--radius-sm)] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-2 text-[10px] font-code text-zinc-700 dark:text-zinc-400 overflow-x-auto">
+                {JSON.stringify(backendDetails, null, 2)}
+              </pre>
+            )}
+          </div>
+          <div className="rounded-[var(--radius-md)] border border-zinc-100 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/60 p-4">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-200">AI Service</span>
+              <StatusDot
+                status={aiHealth === 'online' ? 'online' : aiHealth === 'checking' ? 'checking' : 'failed'}
+                label={aiHealth}
+              />
             </div>
-            <div className="mt-5 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setIsHealthOpen(false)}
-                className="rounded-lg bg-zinc-100 dark:bg-zinc-800 px-4 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
+            <p className="text-[11px] text-zinc-500 leading-relaxed mb-2 font-sans-ui">
+              Python + FastAPI (:8000) — AST chunking, embeddings, Qdrant vector retrieval, and LLM RAG engine.
+            </p>
+            {aiDetails && (
+              <pre className="rounded-[var(--radius-sm)] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-2 text-[10px] font-code text-zinc-700 dark:text-zinc-400 overflow-x-auto">
+                {JSON.stringify(aiDetails, null, 2)}
+              </pre>
+            )}
           </div>
         </div>
-      )}
+      </Modal>
 
-      {isDocsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in font-sans-ui">
-          <div className="w-full max-w-xl rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-3">
-              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                <span>Sourcefinch</span>
-                <span className="text-zinc-400">· Guide</span>
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsDocsOpen(false)}
-                className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 cursor-pointer text-sm"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="space-y-4 text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed font-sans-ui">
-              <section>
-                <h4 className="font-semibold text-zinc-900 dark:text-zinc-200 mb-1">1. Connect a Repository</h4>
-                <p>
-                  Click <strong>+ Add Repo</strong> in the left sidebar. Paste any public GitHub repository URL and optionally specify a branch.
-                </p>
-              </section>
-              <section>
-                <h4 className="font-semibold text-zinc-900 dark:text-zinc-200 mb-1">2. Ingestion & Embedding</h4>
-                <p>
-                  Sourcefinch clones the repo shallowly, parses code files into semantic AST chunks, embeds them, and indexes them in Qdrant.
-                </p>
-              </section>
-              <section>
-                <h4 className="font-semibold text-zinc-900 dark:text-zinc-200 mb-1">3. Natural Language Q&A</h4>
-                <p>
-                  Select the repository in the sidebar and type any question into the chat prompt. The AI service performs dense vector search and attaches line-level citations.
-                </p>
-              </section>
-            </div>
-            <div className="mt-6 flex justify-end border-t border-zinc-100 dark:border-zinc-800 pt-3">
-              <button
-                type="button"
-                onClick={() => setIsDocsOpen(false)}
-                className="rounded-lg bg-black dark:bg-white text-white dark:text-black px-4 py-1.5 text-xs font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-200 cursor-pointer"
-              >
-                Got it
-              </button>
-            </div>
-          </div>
+      <Modal
+        open={isDocsOpen}
+        onClose={() => setIsDocsOpen(false)}
+        size="lg"
+        title={
+          <span className="flex items-center gap-2">
+            <span>Sourcefinch</span>
+            <span className="text-zinc-400 font-normal">· Guide</span>
+          </span>
+        }
+      >
+        <div className="space-y-4 text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed font-sans-ui">
+          <section>
+            <h4 className="font-semibold text-zinc-900 dark:text-zinc-200 mb-1">1. Connect a Repository</h4>
+            <p>
+              Click <strong>+ Add Repo</strong> in the left sidebar. Paste any public GitHub repository URL and optionally specify a branch.
+            </p>
+          </section>
+          <section>
+            <h4 className="font-semibold text-zinc-900 dark:text-zinc-200 mb-1">2. Ingestion & Embedding</h4>
+            <p>
+              Sourcefinch clones the repo shallowly, parses code files into semantic AST chunks, embeds them, and indexes them in Qdrant.
+            </p>
+          </section>
+          <section>
+            <h4 className="font-semibold text-zinc-900 dark:text-zinc-200 mb-1">3. Natural Language Q&amp;A</h4>
+            <p>
+              Select the repository in the sidebar and type any question into the chat prompt. The AI service performs dense vector search and attaches line-level citations.
+            </p>
+          </section>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

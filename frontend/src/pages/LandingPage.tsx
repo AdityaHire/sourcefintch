@@ -70,7 +70,7 @@ export default function LandingPage() {
           {isSignedIn ? (
             <UserButton afterSignOutUrl="/" />
           ) : (
-            <SignInButton mode="modal" afterSignInUrl="/workspace">
+            <SignInButton mode="modal" forceRedirectUrl="/workspace">
               <button
                 type="button"
                 className="rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 px-3.5 py-1.5 text-xs font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors cursor-pointer font-sans-ui"

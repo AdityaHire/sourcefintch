@@ -13,7 +13,7 @@ export default function CodeViewer({ citation, activeRepo, onClose }: CodeViewer
 
   if (!citation) {
     return (
-      <div className="relative flex h-full w-full flex-col items-center justify-center border-l border-zinc-200/80 dark:border-zinc-800/60 bg-white/40 dark:bg-[#0a0a0c]/50 backdrop-blur-md p-8 text-center select-none font-sans-ui">
+      <div className="relative flex h-full w-full flex-col items-center justify-center border-l border-zinc-200/80 dark:border-zinc-800/60 bg-white/40 dark:bg-zinc-950/50 backdrop-blur-md p-8 text-center select-none font-sans-ui">
         {onClose && (
           <button
             type="button"
@@ -58,7 +58,7 @@ export default function CodeViewer({ citation, activeRepo, onClose }: CodeViewer
   const scorePct = Math.round((citation.score || 0) * 100);
 
   return (
-    <div className="flex h-full w-full flex-col border-l border-zinc-200/80 dark:border-zinc-800/60 bg-white/50 dark:bg-[#0a0a0c]/60 backdrop-blur-md font-sans-ui select-none">
+    <div className="flex h-full w-full flex-col border-l border-zinc-200/80 dark:border-zinc-800/60 bg-white/50 dark:bg-zinc-950/60 backdrop-blur-md font-sans-ui select-none">
       {/* ── Top Header: File Info & Controls ──────────────────────────────── */}
       <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/70 dark:bg-zinc-900/50 px-4 py-2.5">
         <div className="flex items-center gap-2.5 overflow-hidden min-w-0">
