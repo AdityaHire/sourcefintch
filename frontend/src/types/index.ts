@@ -64,6 +64,15 @@ export interface Conversation {
 }
 
 /** Response from POST /api/chat. */
+export interface RepositoryFile {
+  id: number;
+  repository_id: number;
+  file_path: string;
+  language?: string | null;
+  file_size?: number;
+  content?: string | null;
+}
+
 export interface ChatResponse {
   conversation_id: number;
   message: {

@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
+import { useUser } from '@clerk/clerk-react';
 import Sidebar from './Sidebar';
 import CodeViewer from './CodeViewer';
 import MarkdownRenderer from './MarkdownRenderer';
@@ -24,11 +25,17 @@ import {
   Layers,
   Code2,
   FileSearch,
+  FolderGit2,
+  Clock,
+  FolderTree,
+  X,
 } from 'lucide-react';
 import {
   PromptInputBox,
   type PromptInputBoxHandle,
 } from './ui/PromptInputBox';
+import FileTree from './ui/file-tree';
+import type { RepositoryFile } from '../types';
 import type { SidebarTab } from './Sidebar';
 
 export interface ChatInterfaceProps {
@@ -62,6 +69,11 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
   const [selectedCitation, setSelectedCitation] = useState<SourceCitation | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isCodeViewerOpen, setIsCodeViewerOpen] = useState(false);
+  const [isFileTreeOpen, setIsFileTreeOpen] = useState(false);
+  const [repoFiles, setRepoFiles] = useState<RepositoryFile[]>([]);
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<RepositoryFile | null>(null);
+  const [latestAnimatedMsgId, setLatestAnimatedMsgId] = useState<number | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<PromptInputBoxHandle>(null);
@@ -133,6 +145,30 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
     };
   }, []);
 
+  // ── Fetch Repository File Tree ───────────────────────────────────────────
+  const fetchRepoFiles = useCallback(async (repoId: number) => {
+    setIsLoadingFiles(true);
+    try {
+      const files = await api.getRepositoryFiles(repoId);
+      setRepoFiles(files);
+      if (files.length > 0) {
+        setSelectedFile((prev) => (prev && files.some((f) => f.id === prev.id) ? prev : files[0]));
+      }
+    } catch (err: any) {
+      console.error('Failed to load repo files:', err);
+    } finally {
+      setIsLoadingFiles(false);
+    }
+  }, [api]);
+
+  const handleToggleFileTree = () => {
+    if (!isFileTreeOpen && selectedRepoId) {
+      fetchRepoFiles(selectedRepoId);
+    }
+    setIsFileTreeOpen(!isFileTreeOpen);
+    if (isCodeViewerOpen) setIsCodeViewerOpen(false);
+  };
+
   // ── Switch repository ─────────────────────────────────────────────────────
   const handleRepoChange = (newRepoId: number) => {
     setSelectedRepoId(newRepoId);
@@ -140,6 +176,9 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
     setMessages([]);
     setSelectedCitation(null);
     setIsCodeViewerOpen(false);
+    setIsFileTreeOpen(false);
+    setRepoFiles([]);
+    setSelectedFile(null);
     setErrorMessage(null);
 
     const url = new URL(window.location.href);
@@ -244,6 +283,7 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
         sources: response.message.sources,
         created_at: new Date().toISOString(),
       };
+      setLatestAnimatedMsgId(response.message.id);
       setMessages((prev) => [...prev, assistantMsg]);
 
       // Cache latest citation for Show Code inspection
@@ -323,15 +363,15 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
       />
 
       {/* ── 2. CENTER PANEL: Chat Workspace ───────────────────────────────── */}
-      <div className="relative flex flex-1 flex-col h-full min-w-0 overflow-hidden bg-white/20 dark:bg-transparent">
-        {/* ── Top Repository Bar ──────────────────────────────────────────── */}
-        <div className="flex items-center justify-between border-b border-zinc-200/80 dark:border-zinc-800/60 bg-white/50 dark:bg-zinc-950/50 px-4 sm:px-6 py-2.5 shrink-0 backdrop-blur-md z-10">
+      <div className="relative flex flex-1 flex-col h-full min-w-0 overflow-hidden bg-transparent">
+        {/* ── Top Repository Bar (minimal/transparent) ────────────────────── */}
+        <div className="flex items-center justify-between border-b border-zinc-200/60 dark:border-white/[0.04] bg-white/50 dark:bg-zinc-950/30 backdrop-blur-xl px-4 sm:px-6 py-2.5 shrink-0 z-10">
           {/* Left: Dominant repo name + branch & indexed status */}
           <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
               onClick={() => setIsMobileSidebarOpen(true)}
-              className="md:hidden rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white cursor-pointer transition-colors"
+              className="md:hidden rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-white/[0.06] hover:text-zinc-900 dark:hover:text-white cursor-pointer transition-colors"
               title="Open repositories"
             >
               <Menu className="w-4 h-4" />
@@ -343,8 +383,8 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
               </span>
 
               {activeRepo && (
-                <div className="hidden sm:flex items-center gap-1.5 text-[12px] text-zinc-500 dark:text-zinc-400 font-sans-ui">
-                  <span className="rounded-md bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 px-1.5 py-0.5 font-code text-[11px] text-zinc-600 dark:text-zinc-400">
+                <div className="hidden sm:flex items-center gap-1.5 text-[12px] text-zinc-500 dark:text-zinc-500 font-sans-ui">
+                  <span className="rounded-md bg-zinc-100 dark:bg-white/[0.06] border border-zinc-200/80 dark:border-white/[0.08] px-1.5 py-0.5 font-code text-[11px] text-zinc-600 dark:text-zinc-400">
                     {activeRepo.branch || 'main'}
                   </span>
                   <span>·</span>
@@ -358,8 +398,24 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
             </div>
           </div>
 
-          {/* Right: Show Code, Chat ID & Primary + New Chat Button */}
+          {/* Right: Files, Show Code & Primary + New Chat Button */}
           <div className="flex items-center gap-2 shrink-0">
+            {/* Files (Folder Structure) toggle button */}
+            <button
+              type="button"
+              onClick={handleToggleFileTree}
+              disabled={!selectedRepoId}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer shadow-xs font-sans-ui disabled:opacity-40 disabled:cursor-not-allowed ${
+                isFileTreeOpen
+                  ? 'bg-zinc-900 dark:bg-white/15 text-white ring-1 ring-zinc-700 dark:ring-white/10 hover:bg-zinc-800 dark:hover:bg-white/20'
+                  : 'bg-zinc-100 dark:bg-white/[0.06] text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-white/10 hover:text-zinc-900 dark:hover:text-white'
+              }`}
+              title={isFileTreeOpen ? 'Hide folder structure' : 'Show folder structure'}
+            >
+              <FolderTree className="w-3.5 h-3.5" />
+              <span>{isFileTreeOpen ? 'Hide Files' : 'Files'}</span>
+            </button>
+
             {/* Show Code toggle button */}
             <button
               type="button"
@@ -372,12 +428,13 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
                     }
                   }
                 }
+                if (isFileTreeOpen) setIsFileTreeOpen(false);
                 setIsCodeViewerOpen(!isCodeViewerOpen);
               }}
               className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer shadow-xs font-sans-ui ${
                 isCodeViewerOpen
-                  ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-200 ring-1 ring-zinc-700 dark:ring-zinc-300'
-                  : 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-100'
+                  ? 'bg-zinc-900 dark:bg-white/15 text-white ring-1 ring-zinc-700 dark:ring-white/10 hover:bg-zinc-800 dark:hover:bg-white/20'
+                  : 'bg-zinc-100 dark:bg-white/[0.06] text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-white/10 hover:text-zinc-900 dark:hover:text-white'
               }`}
               title={isCodeViewerOpen ? 'Hide code viewer' : 'Show code viewer'}
             >
@@ -390,7 +447,7 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
               type="button"
               onClick={handleNewChat}
               disabled={isSubmitting || (messages.length === 0 && !conversationId)}
-              className="flex items-center gap-1.5 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 px-3 py-1.5 text-xs font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-all cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed font-sans-ui"
+              className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-600 text-white px-3 py-1.5 text-xs font-semibold hover:from-orange-600 hover:to-amber-700 transition-all cursor-pointer shadow-sm shadow-orange-500/20 disabled:opacity-40 disabled:cursor-not-allowed font-sans-ui"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>New Chat</span>
@@ -424,43 +481,16 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
               <Skeleton className="h-32 w-full" />
             </div>
           ) : messages.length === 0 ? (
-            /* ── Empty State with Suggested Starters ───────────────────────── */
-            <div className="flex h-full flex-col items-center justify-center max-w-xl mx-auto text-center px-4 my-auto select-none">
-              <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-700 dark:text-zinc-300 mb-4 shadow-xs">
-                <Sparkles className="w-6 h-6" />
-              </div>
-
-              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-white mb-2 font-sans-ui">
-                {activeRepo ? `Explore ${activeRepo.name}` : 'Select a Repository'}
-              </h2>
-              <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 max-w-md leading-relaxed mb-8 font-sans-ui">
-                Ask any architectural or bug investigation question. Answers are grounded in your indexed source code.
-              </p>
-
-              {/* Suggested Questions Grid */}
-              <div className="w-full text-left space-y-2">
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 px-1 font-sans-ui">
-                  Try asking:
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {starterPrompts.map((item, idx) => {
-                    const Icon = item.icon;
-                    return (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => handleSendMessage(item.query)}
-                        disabled={!selectedRepoId || isSubmitting}
-                        className="flex items-center gap-2.5 rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 p-3 text-left text-xs text-zinc-700 dark:text-zinc-300 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white transition-all cursor-pointer shadow-2xs font-sans-ui group disabled:opacity-50"
-                      >
-                        <Icon className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400 shrink-0 group-hover:scale-110 transition-transform" />
-                        <span className="font-medium truncate">{item.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
+            /* ── Replit-Inspired Empty State ────────────────────────────────── */
+            <ReplitEmptyState
+              repositories={repositories}
+              activeRepo={activeRepo}
+              selectedRepoId={selectedRepoId}
+              isSubmitting={isSubmitting}
+              starterPrompts={starterPrompts}
+              onSendMessage={handleSendMessage}
+              onSelectRepo={handleRepoChange}
+            />
           ) : (
             /* ── Compact, High-Density Conversation Messages ─────────────── */
             <div className="max-w-3xl mx-auto w-full space-y-5">
@@ -469,9 +499,9 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
                 return (
                   <motion.div
                     key={index}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                    initial={{ opacity: 0, y: 8, filter: 'blur(3px)' }}
+                    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                    transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
                     className={`flex flex-col ${
                       index > 0 && !isUser ? 'pt-4' : ''
                     }`}
@@ -480,9 +510,10 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
                     <div className={`flex items-center gap-2 text-[11.5px] mb-1.5 font-sans-ui ${isUser ? 'justify-end' : 'justify-start'}`}>
                       <span className={`font-medium ${isUser ? 'text-zinc-500 dark:text-zinc-400' : 'text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5'}`}>
                         {!isUser && (
-                          <span className="w-4 h-4 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-[9px] font-code text-zinc-700 dark:text-zinc-300 font-bold">
-                            SF
-                          </span>
+                          <>
+                            <img src="/logo2.png" alt="Sourcefinch" className="w-4 h-4 rounded-sm object-contain dark:hidden" />
+                            <img src="/logo.png" alt="Sourcefinch" className="w-4 h-4 rounded-sm object-contain hidden dark:block" />
+                          </>
                         )}
                         {isUser ? 'You' : 'Sourcefinch'}
                       </span>
@@ -505,7 +536,12 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
                       /* Assistant message: structured document format */
                       <div className="flex flex-col items-start w-full">
                         {msg.content ? (
-                          <MarkdownRenderer content={msg.content} onOpenCode={handleOpenCode} />
+                          <MarkdownRenderer
+                            content={msg.content}
+                            onOpenCode={handleOpenCode}
+                            animate={!isUser && msg.id === latestAnimatedMsgId}
+                            onTypingComplete={scrollToBottom}
+                          />
                         ) : (
                           <div className="max-w-[72ch] rounded-xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/[0.06] px-4 py-3 text-xs text-amber-900 dark:text-amber-200 font-sans-ui">
                             No answer was generated for this question. The LLM returned an empty response — this can happen with very short queries or if the model truncated its output. Try rephrasing your question.
@@ -514,7 +550,12 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
 
                         {/* ── CITED SOURCES · Prominent Interactive Table ── */}
                         {msg.sources && msg.sources.length > 0 && (
-                          <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-900/80 w-full max-w-[72ch]">
+                          <motion.div
+                            initial={{ opacity: 0, y: 6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.3, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                            className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-900/80 w-full max-w-[72ch]"
+                          >
                             <div className="flex items-center justify-between mb-2">
                               <div className="text-[11px] font-semibold tracking-wider text-zinc-500 dark:text-zinc-400 uppercase font-sans-ui flex items-center gap-1.5">
                                 <FileCode className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
@@ -567,7 +608,7 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
                                 );
                               })}
                             </div>
-                          </div>
+                          </motion.div>
                         )}
                       </div>
                     )}
@@ -578,9 +619,8 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
               {/* ── Minimal thinking indicator while generating ──────────── */}
               {isSubmitting && (
                 <div className="flex items-center gap-1.5 text-[11.5px] font-sans-ui text-zinc-500 dark:text-zinc-400 pt-2">
-                  <span className="w-4 h-4 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-[9px] font-code text-zinc-700 dark:text-zinc-300 font-bold shrink-0">
-                    SF
-                  </span>
+                  <img src="/logo2.png" alt="Sourcefinch" className="w-4 h-4 rounded-sm object-contain shrink-0 dark:hidden" />
+                  <img src="/logo.png" alt="Sourcefinch" className="w-4 h-4 rounded-sm object-contain shrink-0 hidden dark:block" />
                   <span className="font-semibold text-zinc-900 dark:text-zinc-100 mr-1">Sourcefinch</span>
                   <ThinkingTool isThinking={true} />
                 </div>
@@ -591,14 +631,14 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
           )}
         </div>
 
-        {/* ── 3. Bottom Composer: PromptInputBox ───────────────────────────────── */}
-        <div className="relative z-10 border-t border-zinc-200/80 dark:border-zinc-800/60 bg-white/60 dark:bg-zinc-950/60 p-3 sm:p-4 shrink-0 backdrop-blur-md">
-          <div className="max-w-3xl mx-auto w-full">
+        {/* ── 3. Bottom Composer: Floating PromptInputBox ───────────────────── */}
+        <div className="relative z-10 px-4 pb-5 pt-1 shrink-0 bg-transparent">
+          <div className="max-w-2xl mx-auto w-full">
             <PromptInputBox
               ref={composerRef}
               placeholder={
                 selectedRepoId
-                  ? 'Ask anything about this repository...'
+                  ? 'Start chatting or describe a task...'
                   : 'Select a repository to start'
               }
               disabled={!selectedRepoId || isSubmitting}
@@ -607,7 +647,7 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
             />
 
             {/* Subdued User Benefit Copy */}
-            <div className="mt-1.5 px-1 flex items-center justify-between text-[11px] text-zinc-400 dark:text-zinc-500 font-sans-ui">
+            <div className="mt-2 px-1 flex items-center justify-between text-[11px] text-zinc-400 dark:text-zinc-500 font-sans-ui">
               <span>Answers grounded in your source code</span>
               <span className="hidden sm:inline font-code text-[10px]">Return ↵ to send</span>
             </div>
@@ -635,6 +675,163 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── 4. FULLSCREEN REPO FILES & CODE EXPLORER OVERLAY ────────────── */}
+      <AnimatePresence>
+        {isFileTreeOpen && (
+          <motion.div
+            key="file-tree-viewer"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.99 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="absolute inset-0 w-full h-full z-30 flex bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md overflow-hidden"
+            style={{ transformOrigin: 'center' }}
+          >
+            {/* Left: Interactive File Tree panel */}
+            <div className="w-72 sm:w-80 md:w-88 border-r border-zinc-200/80 dark:border-white/[0.06] flex flex-col h-full bg-zinc-50/50 dark:bg-zinc-950/50 shrink-0">
+              <FileTree
+                files={repoFiles}
+                isLoading={isLoadingFiles}
+                repoName={activeRepo?.name}
+                selectedPath={selectedFile?.file_path}
+                onSelectFile={(file) => setSelectedFile(file)}
+              />
+            </div>
+
+            {/* Right: Code Inspector preview for selected file */}
+            <div className="flex-1 min-w-0 h-full flex flex-col">
+              <CodeViewer
+                activeFile={selectedFile}
+                activeRepo={activeRepo}
+                onClose={() => setIsFileTreeOpen(false)}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ── Replit-Inspired Empty State Component ──────────────────────────────────
+function ReplitEmptyState({
+  repositories,
+  activeRepo,
+  selectedRepoId,
+  isSubmitting,
+  starterPrompts,
+  onSendMessage,
+  onSelectRepo,
+}: {
+  repositories: Repository[];
+  activeRepo: Repository | null;
+  selectedRepoId: number | null;
+  isSubmitting: boolean;
+  starterPrompts: { label: string; icon: React.ComponentType<{ className?: string }>; query: string }[];
+  onSendMessage: (text: string) => void;
+  onSelectRepo: (repoId: number) => void;
+}) {
+  const { user } = useUser();
+  const displayName = user?.firstName || user?.username || 'there';
+
+  // Show up to 3 most recent repos
+  const recentRepos = repositories.slice(0, 3);
+
+  return (
+    <div className="flex h-full flex-col items-center justify-start pt-1 sm:pt-2 max-w-2xl mx-auto px-4 select-none">
+      {/* ── Recent Projects (Positioned near header) ──────────────────── */}
+      {recentRepos.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+          className="w-full mb-12 sm:mb-16 md:mb-20"
+        >
+          <div className="text-[10.5px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-1.5 font-sans-ui">
+            Recent projects
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            {recentRepos.map((repo) => {
+              const isSelected = selectedRepoId === repo.id;
+              return (
+                <button
+                  key={repo.id}
+                  type="button"
+                  onClick={() => onSelectRepo(repo.id)}
+                  className={`group text-left rounded-xl border p-2.5 sm:p-3 transition-all duration-150 cursor-pointer ${
+                    isSelected
+                      ? 'border-orange-500/40 bg-orange-500/[0.08] shadow-xs'
+                      : 'border-zinc-200/80 dark:border-white/[0.06] bg-white/60 dark:bg-white/[0.02] hover:border-zinc-300 dark:hover:border-white/[0.12] hover:bg-white dark:hover:bg-white/[0.04]'
+                  }`}
+                >
+                  <div className="text-[12px] font-semibold text-zinc-900 dark:text-zinc-200 truncate font-sans-ui mb-1">
+                    {repo.name}
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 dark:text-zinc-500 font-code">
+                    <FolderGit2 className="w-3 h-3 text-zinc-400" />
+                    <span className="truncate">{repo.owner}</span>
+                    <span>·</span>
+                    <Clock className="w-3 h-3 text-zinc-400" />
+                    <span>{repo.branch || 'main'}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── Personalized Greeting (Single Line) ───────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
+        className="text-center mb-6 max-w-4xl w-full"
+      >
+        <h1 className="text-xl sm:text-2xl md:text-[28px] lg:text-[32px] font-bold tracking-tight text-zinc-900 dark:text-white font-sans-ui whitespace-nowrap">
+          {displayName}, what are we working on today?
+        </h1>
+        {activeRepo && (
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 font-sans-ui mt-1.5">
+            Currently exploring <span className="text-zinc-900 dark:text-zinc-200 font-semibold">{activeRepo.name}</span>
+          </p>
+        )}
+      </motion.div>
+
+      {/* ── Suggested Prompts (Slim Sleek Pills) ──────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+        className="w-full max-w-lg"
+      >
+        <div className="flex items-center gap-1.5 mb-2 px-1">
+          <span className="text-[10.5px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider font-sans-ui">
+            Suggested for you
+          </span>
+          <Sparkles className="w-3 h-3 text-orange-500" />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          {starterPrompts.slice(0, 3).map((item, idx) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => onSendMessage(item.query)}
+                disabled={!selectedRepoId || isSubmitting}
+                className="group flex items-center gap-2.5 rounded-xl border border-zinc-200/80 dark:border-white/[0.06] bg-white/60 dark:bg-white/[0.02] px-3.5 py-2 text-left text-[12.5px] text-zinc-700 dark:text-zinc-300 hover:border-orange-500/40 hover:bg-orange-500/[0.04] hover:text-zinc-900 dark:hover:text-white transition-all cursor-pointer font-sans-ui disabled:opacity-50 shadow-2xs"
+              >
+                <div className="w-5 h-5 rounded-md bg-zinc-100 dark:bg-white/[0.06] flex items-center justify-center shrink-0 group-hover:bg-orange-500/10 transition-colors">
+                  <Icon className="w-3 h-3 text-zinc-500 dark:text-zinc-400 group-hover:text-orange-500 transition-colors" />
+                </div>
+                <span className="font-medium truncate">{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </motion.div>
     </div>
   );
 }

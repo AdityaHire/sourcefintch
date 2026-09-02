@@ -16,7 +16,7 @@ import ChatInterface from '../components/ChatInterface';
 import CinematicLandingHero from '../components/CinematicLandingHero';
 import LandingPageContent from '../components/LandingPageContent';
 import { ShaderBackground } from '@/components/ui/waves-shader';
-import { ValleyOfTheMindShader } from '@/components/ui/valley-of-the-mind';
+import { BgGradient } from '@/components/ui/bg-gradient';
 import { Modal } from '../components/ui/Modal';
 
 export default function WorkspacePage() {
@@ -69,15 +69,27 @@ export default function WorkspacePage() {
     );
   }
 
-  // ── Workspace view — full-height flex, NO top navbar ──────────────────
+  // ── Workspace view — Replit-inspired workspace (light + dark) ───────────
   return (
-    <div className="h-screen w-full flex bg-gradient-to-br from-zinc-50/90 via-white/80 to-zinc-100/70 dark:from-zinc-950 dark:via-zinc-950 dark:to-zinc-900 text-zinc-900 dark:text-zinc-100 font-sans-ui overflow-hidden">
-      {/* Background shader sits behind everything. */}
-      <div className="fixed inset-0 z-0 pointer-events-none opacity-40 dark:opacity-30 overflow-hidden">
-        <ValleyOfTheMindShader className="h-full w-full" />
-      </div>
+    <div className="h-screen w-full flex bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans-ui overflow-hidden">
+      {/* Animated background gradient — adapts to light/dark */}
+      <BgGradient intensity="medium" />
 
-      <main className="relative z-10 flex-1 h-full min-w-0 overflow-hidden flex flex-col">
+      {/* Subtle radial overlay for depth */}
+      <div
+        className="fixed inset-0 z-0 pointer-events-none"
+        style={{
+          background:
+            'radial-gradient(ellipse at 50% 0%, transparent 0%, var(--bg-overlay-end, rgba(250,250,250,0.5)) 80%)',
+        }}
+      />
+      {/* CSS custom property set per theme */}
+      <style>{`
+        :root { --bg-overlay-end: rgba(250,250,250,0.5); }
+        .dark { --bg-overlay-end: rgba(9,9,11,0.7); }
+      `}</style>
+
+      <main className="relative z-10 flex-1 h-full min-w-0 overflow-hidden flex">
         <ChatInterface
           activeTab={activeTab}
           onNavigateTo={navigateTo}

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { motion } from 'motion/react';
 import { marked, type Token, type Tokens } from 'marked';
 import { Copy, Check, Code2 } from 'lucide-react';
 
@@ -6,6 +7,9 @@ interface MarkdownRendererProps {
   content: string;
   className?: string;
   onOpenCode?: (filePath: string, startLine?: number, endLine?: number) => void;
+  /** Whether to animate this message with a smooth staggered fade-rise animation */
+  animate?: boolean;
+  onTypingComplete?: () => void;
 }
 
 function CodeBlock({ code, language }: { code: string; language?: string }) {
@@ -76,7 +80,6 @@ function renderInlineTokens(
       }
       case 'codespan': {
         const t = token as Tokens.Codespan;
-        // Check if codespan is a file line range e.g. index.html:246-285
         const match = t.text.match(/^([\w./\-]+):(\d+)(?:[–-](\d+))?$/);
         if (match && onOpenCode) {
           const [, filePath, start, end] = match;
@@ -255,8 +258,10 @@ export default function MarkdownRenderer({
   content,
   className = '',
   onOpenCode,
+  animate = false,
+  onTypingComplete,
 }: MarkdownRendererProps) {
-  const tokens = React.useMemo(() => {
+  const tokens = useMemo(() => {
     try {
       return marked.lexer(content, { gfm: true, breaks: true });
     } catch {
@@ -264,11 +269,73 @@ export default function MarkdownRenderer({
     }
   }, [content]);
 
+  React.useEffect(() => {
+    if (animate) {
+      const timer = setTimeout(() => {
+        onTypingComplete?.();
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [animate, onTypingComplete]);
+
   if (!tokens) {
+    if (animate) {
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: 8, filter: 'blur(4px)' }}
+          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+          className={`whitespace-pre-wrap leading-relaxed font-sans-ui text-zinc-800 dark:text-zinc-200 ${className}`}
+        >
+          {content}
+        </motion.div>
+      );
+    }
     return (
       <div className={`whitespace-pre-wrap leading-relaxed font-sans-ui text-zinc-800 dark:text-zinc-200 ${className}`}>
         {content}
       </div>
+    );
+  }
+
+  // ── Smooth Staggered Block Reveal ───────────────────────────────────────
+  if (animate) {
+    return (
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={{
+          hidden: { opacity: 0 },
+          visible: {
+            opacity: 1,
+            transition: {
+              staggerChildren: 0.06,
+              delayChildren: 0.02,
+            },
+          },
+        }}
+        className={`markdown-body max-w-[72ch] text-[14px] sm:text-[14.5px] leading-relaxed text-zinc-800 dark:text-zinc-200 font-sans-ui ${className}`}
+      >
+        {tokens.map((token, idx) => (
+          <motion.div
+            key={idx}
+            variants={{
+              hidden: { opacity: 0, y: 8, filter: 'blur(3px)' },
+              visible: {
+                opacity: 1,
+                y: 0,
+                filter: 'blur(0px)',
+                transition: {
+                  duration: 0.32,
+                  ease: [0.16, 1, 0.3, 1],
+                },
+              },
+            }}
+          >
+            {renderBlockToken(token, idx, onOpenCode)}
+          </motion.div>
+        ))}
+      </motion.div>
     );
   }
 

@@ -37,6 +37,15 @@
   --duration-route: 250ms;
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Sidebar layout */
+  --sidebar-rail: 56px;
+  --sidebar-expanded: 290px;
+
+  /* Replit-inspired warm accents */
+  --accent-warm: 249 115 22;      /* orange-500 */
+  --accent-warm-light: 251 146 60; /* orange-400 */
+  --accent-warm-muted: 217 119 6;  /* amber-600 */
 }
 
 /* ── Global transition discipline ──────────────────────── */

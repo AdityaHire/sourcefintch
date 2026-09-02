@@ -96,6 +96,28 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   animation: subtlePulse 2s ease-in-out infinite;
 }
 
+/* ── BgGradient orb animations ────────────────────────── */
+@keyframes bgOrbDrift1 {
+  0%   { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(8vw, 12vh) scale(1.15); }
+}
+
+@keyframes bgOrbDrift2 {
+  0%   { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(-10vw, 8vh) scale(1.1); }
+}
+
+@keyframes bgOrbDrift3 {
+  0%   { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(6vw, -10vh) scale(1.08); }
+}
+
+@keyframes bgOrbDrift4 {
+  0%   { transform: translate(0, 0) scale(1); opacity: 0.7; }
+  50%  { opacity: 1; }
+  100% { transform: translate(-5vw, -6vh) scale(0.9); opacity: 0.6; }
+}
+
 /* ── Prefers Reduced Motion ────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -108,7 +130,8 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   }
   .animate-fade-rise,
   .animate-fade-rise-delay,
-  .animate-subtle-pulse {
+  .animate-subtle-pulse,
+  .bg-gradient-orb {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;

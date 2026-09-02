@@ -38,8 +38,8 @@ router.get('/:id', requireAuthOrInternal, getRepository);
 // DELETE /api/repositories/:id
 router.delete('/:id', requireAuth, deleteRepository);
 
-// GET /api/repositories/:id/files — AI service only
-router.get('/:id/files', requireInternalSecret, getRepositoryFiles);
+// GET /api/repositories/:id/files — Frontend and AI service
+router.get('/:id/files', requireAuthOrInternal, getRepositoryFiles);
 
 // PATCH /api/repositories/:id/status — AI service only
 router.patch('/:id/status', requireInternalSecret, updateRepositoryStatus);

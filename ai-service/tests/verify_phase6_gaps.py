@@ -178,7 +178,7 @@ def main():
         sys_prompt = "You are a helpful code assistant. State what this repo is and cite [README:1-1]."
         user_prompt = "--- [README:1-1] (language: text) ---\nHello World!\n---\nQuestion: What is in the README?"
         raw_completion = asyncio.run(groq_inst.generate_answer(sys_prompt, user_prompt))
-        print(f"    - Direct Groq Raw Completion: \"{raw_completion}\"")
+        print(f"    - Direct Groq Raw Completion: \"{raw_completion.answer}\"")
 
         print("  [OK] GAP #1 PROVEN: Real GroqProvider executed live against api.groq.com (llama-3.1-8b-instant).")
 

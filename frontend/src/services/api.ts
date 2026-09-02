@@ -101,6 +101,14 @@ export async function deleteRepository(
   return jsonOrThrow(res, 'Failed to delete repository');
 }
 
+export async function getRepositoryFiles(
+  authedFetch: AuthedFetch,
+  id: number
+): Promise<import('../types').RepositoryFile[]> {
+  const res = await authedFetch(`/api/repositories/${id}/files`);
+  return jsonOrThrow(res, 'Failed to fetch repository files');
+}
+
 export async function sendChatMessage(
   authedFetch: AuthedFetch,
   payload: {

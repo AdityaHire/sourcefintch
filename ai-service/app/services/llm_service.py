@@ -7,7 +7,8 @@ retrieval, prompt construction, or RAG orchestration.
 """
 
 import logging
-from typing import Protocol
+from dataclasses import dataclass
+from typing import Optional, Protocol
 
 from fastapi import HTTPException
 import httpx
@@ -17,10 +18,39 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
+class GroqAPIError(Exception):
+    """Raised when Groq returns a 413 (payload too large) or 429 (rate limited).
+
+    Carries the original ``status_code`` so the RAG orchestrator can implement
+    provider-specific retry logic (halve chunks on 413, wait on 429) instead of
+    a generic 502 that loses the signal.
+    """
+
+    def __init__(self, status_code: int, detail: str = ""):
+        self.status_code = status_code
+        self.detail = detail
+        super().__init__(detail)
+
+
+@dataclass
+class LLMResult:
+    """Result of an LLM generation call.
+
+    Attributes:
+        answer: The generated response text.
+        usage: Raw ``usage`` dict from the provider (contains
+            ``prompt_tokens``, ``completion_tokens``, etc.) or ``None``
+            if the provider did not report usage.
+    """
+
+    answer: str
+    usage: Optional[dict] = None
+
+
 class LLMProvider(Protocol):
     """Protocol defining the interface for all LLM providers."""
 
-    async def generate_answer(self, system_prompt: str, user_prompt: str) -> str:
+    async def generate_answer(self, system_prompt: str, user_prompt: str) -> LLMResult:
         """Generate a natural language answer from system and user prompts.
 
         Args:
@@ -28,9 +58,11 @@ class LLMProvider(Protocol):
             user_prompt: User question and retrieved context blocks.
 
         Returns:
-            The generated response text.
+            An ``LLMResult`` with the generated text and optional provider
+            token-usage metadata.
 
         Raises:
+            GroqAPIError: On 413 or 429 from Groq (preserves status_code).
             HTTPException(504): If the provider call times out.
             HTTPException(502): If the provider API returns an error or is unreachable.
         """
@@ -47,7 +79,7 @@ class GroqProvider:
         self.model = model or settings.llm_model
         self.timeout_seconds = timeout_seconds or settings.llm_timeout_seconds
 
-    async def generate_answer(self, system_prompt: str, user_prompt: str) -> str:
+    async def generate_answer(self, system_prompt: str, user_prompt: str) -> LLMResult:
         if not self.api_key:
             logger.error("Groq API key is not configured.")
             raise HTTPException(
@@ -74,13 +106,15 @@ class GroqProvider:
                 response = await client.post(self.API_URL, headers=headers, json=payload)
                 response.raise_for_status()
                 data = response.json()
+                prompt_tokens = data.get("usage", {}).get("prompt_tokens")
+                completion_tokens = data.get("usage", {}).get("completion_tokens")
                 logger.info(
                     "Groq API Response | Status: %s | Model: %s | ID: %s | Prompt Tokens: %s, Completion Tokens: %s",
                     response.status_code,
                     data.get("model"),
                     data.get("id"),
-                    data.get("usage", {}).get("prompt_tokens"),
-                    data.get("usage", {}).get("completion_tokens"),
+                    prompt_tokens,
+                    completion_tokens,
                 )
                 logger.debug("Groq raw response JSON: %s", data)
                 choice = data.get("choices", [{}])[0] if data.get("choices") else {}
@@ -94,8 +128,8 @@ class GroqProvider:
                 )
                 if content is None:
                     logger.error("Groq returned null/empty content. Full response: %s", data)
-                    return ""
-                return content.strip()
+                    return LLMResult(answer="", usage=data.get("usage"))
+                return LLMResult(answer=content.strip(), usage=data.get("usage"))
         except httpx.TimeoutException as exc:
             logger.error("Groq API call timed out after %ss: %s", self.timeout_seconds, exc)
             raise HTTPException(
@@ -106,10 +140,12 @@ class GroqProvider:
             status = exc.response.status_code
             err_text = exc.response.text
             logger.error("Groq API returned HTTP %s: %s", status, err_text[:200])
+            if status in (413, 429):
+                raise GroqAPIError(status_code=status, detail=err_text) from exc
             raise HTTPException(
                 status_code=502,
                 detail=f"Groq API error ({status}): {err_text}",
-            )
+            ) from exc
         except httpx.RequestError as exc:
             logger.error("Failed to reach Groq API: %s", exc)
             raise HTTPException(
@@ -127,7 +163,7 @@ class OllamaProvider:
         self.model = model
         self.timeout_seconds = timeout_seconds
 
-    async def generate_answer(self, system_prompt: str, user_prompt: str) -> str:
+    async def generate_answer(self, system_prompt: str, user_prompt: str) -> LLMResult:
         payload = {
             "model": self.model,
             "messages": [
@@ -142,7 +178,10 @@ class OllamaProvider:
                 response = await client.post(self.API_URL, json=payload)
                 response.raise_for_status()
                 data = response.json()
-                return data.get("message", {}).get("content", "").strip()
+                return LLMResult(
+                    answer=data.get("message", {}).get("content", "").strip(),
+                    usage=data.get("eval_count"),
+                )
         except httpx.TimeoutException as exc:
             raise HTTPException(status_code=504, detail=f"Ollama request timed out after {self.timeout_seconds}s")
         except Exception as exc:
@@ -155,10 +194,13 @@ class MockLLMProvider:
     def __init__(self, default_response: str = "Based on the repository context in [README:1-1], this repository is a demonstration project containing 'Hello World!'."):
         self.default_response = default_response
 
-    async def generate_answer(self, system_prompt: str, user_prompt: str) -> str:
+    async def generate_answer(self, system_prompt: str, user_prompt: str) -> LLMResult:
         if "README" in user_prompt:
-            return "According to [README:1-1], this repository is a sample Hello World project containing the text 'Hello World!'."
-        return self.default_response
+            return LLMResult(
+                answer="According to [README:1-1], this repository is a sample Hello World project containing the text 'Hello World!'.",
+                usage=None,
+            )
+        return LLMResult(answer=self.default_response, usage=None)
 
 
 def get_llm_provider() -> LLMProvider:

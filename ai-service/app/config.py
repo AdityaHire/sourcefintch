@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     rag_top_k: int = 5
     rag_min_score: float = 0.20
     rag_max_context_chars: int = 12000
+    # Safe token estimate threshold for pre-flight trimming (Groq 8k TPM limit).
+    # Leaves margin so we proactively trim before hitting a 413.
+    rag_max_estimated_tokens: int = 7000
 
     # ── Embeddings ──────────────────────────────────
     embedding_provider: str = "local"

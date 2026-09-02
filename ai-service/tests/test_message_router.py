@@ -13,6 +13,7 @@ import asyncio
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from app.services.llm_service import LLMResult
 from app.services.message_router import (
     AMBIGUOUS_CLARIFY,
     OFF_TOPIC_REDIRECT,
@@ -102,7 +103,7 @@ class TestConversationalHandler(IsolatedAsyncioTestCase):
 
     async def test_greeting_returns_direct_reply(self):
         with patch("app.services.message_router.get_llm_provider") as get_llm:
-            get_llm.return_value.generate_answer = AsyncMock(return_value="Hello! I'm Sourcefinch's assistant.")
+            get_llm.return_value.generate_answer = AsyncMock(return_value=LLMResult(answer="Hello! I'm Sourcefinch's assistant."))
             result = await handle_conversational("hi, who are you?")
             self.assertEqual(result["sources"], [])
             self.assertIn("Sourcefinch", result["answer"])
@@ -110,7 +111,7 @@ class TestConversationalHandler(IsolatedAsyncioTestCase):
 
     async def test_thanks_returns_direct_reply(self):
         with patch("app.services.message_router.get_llm_provider") as get_llm:
-            get_llm.return_value.generate_answer = AsyncMock(return_value="You're welcome!")
+            get_llm.return_value.generate_answer = AsyncMock(return_value=LLMResult(answer="You're welcome!"))
             result = await handle_conversational("thanks for the help")
             self.assertEqual(result["sources"], [])
             self.assertTrue(result["answer"])

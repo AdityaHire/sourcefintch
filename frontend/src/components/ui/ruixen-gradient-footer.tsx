@@ -73,11 +73,8 @@ export function RuixenGradientFooter({ onOpenWorkspace, onOpenDocs }: RuixenFoot
         <div className="grid grid-cols-1 md:grid-cols-5 gap-10 pb-12 border-b border-zinc-200/50 dark:border-zinc-800/60">
           <div className="md:col-span-2 space-y-4">
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-teal-500 flex items-center justify-center text-white shadow-xs">
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
+              <img src="/logo2.png" alt="Sourcefinch" className="w-7 h-7 object-contain rounded-lg shadow-xs dark:hidden" />
+              <img src="/logo.png" alt="Sourcefinch" className="w-7 h-7 object-contain rounded-lg shadow-xs hidden dark:block" />
               <span className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-white font-sans-ui">
                 Sourcefinch
               </span>

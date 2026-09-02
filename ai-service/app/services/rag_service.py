@@ -15,19 +15,64 @@ Coordinates:
 7. LLM answer generation and traceable sources response formatting.
 """
 
+import asyncio
 import json
 import logging
 from typing import Optional
 
+import tiktoken
 from fastapi import HTTPException
 import httpx
 
 from app.config import settings
 from app.services.llm_service import get_llm_provider
+from app.services.llm_service import GroqAPIError, LLMResult
 from app.services.node_internal_client import async_internal_get
 from app.services.retrieval_service import retrieve_relevant_chunks
 
 logger = logging.getLogger(__name__)
+
+_encoding = tiktoken.get_encoding("cl100k_base")
+
+
+def estimate_tokens(text: str) -> int:
+    """Estimate the number of tokens in *text* using tiktoken's cl100k_base encoding.
+
+    Cached at module load — the encoding object is created once and reused
+    across all calls, avoiding repeated lookup overhead.
+    """
+    return len(_encoding.encode(text))
+
+
+def estimate_full_prompt_tokens(
+    system_prompt: str,
+    question: str,
+    chunks: list[dict],
+    conversation_history: Optional[list] = None,
+) -> int:
+    """Estimate the total token count of the full assembled prompt sent to the LLM.
+
+    Mirrors exactly what Groq receives: system prompt + conversation history
+    (if any) + context chunks + user question.  This is NOT just the raw
+    question — it includes all retrieved context so the estimate reflects the
+    actual API payload size.
+    """
+    user_prompt = build_user_prompt(question, chunks)
+
+    history_block = ""
+    if conversation_history:
+        recent = conversation_history[-6:]
+        history_block = "\n".join(
+            f"{h.get('role', 'user')}: {h.get('content', '')}"
+            for h in recent
+            if isinstance(h, dict)
+        )
+
+    full_prompt = system_prompt
+    if history_block:
+        full_prompt += "\n" + history_block
+    full_prompt += "\n" + user_prompt
+    return estimate_tokens(full_prompt)
 
 FALLBACK_NO_EVIDENCE = (
     "I couldn't find enough evidence in the indexed repository to answer this confidently."
@@ -155,12 +200,12 @@ async def rewrite_query(question: str, conversation_history: Optional[list]) -> 
 
     try:
         llm = get_llm_provider()
-        rewritten = await llm.generate_answer(
+        result = await llm.generate_answer(
             system_prompt=QUERY_REWRITE_SYSTEM,
             user_prompt=user_content,
         )
-        if rewritten:
-            return rewritten
+        if result and result.answer:
+            return result.answer
         return question
     except Exception as exc:
         logger.warning("Query rewrite failed; using original question: %s", exc)
@@ -245,11 +290,60 @@ async def answer_question(repository_id: int, question: str, conversation_histor
         retained_chunks[-1].get("score", 0.0) if retained_chunks else 0.0,
     )
 
-    # ── Step 6: Format prompts ───────────────────────────────────────
+    # ── Step 6: Format prompts & pre-flight token estimation ────────────
     user_prompt = build_user_prompt(question, retained_chunks)
+
+    estimated_tokens = estimate_full_prompt_tokens(
+        SYSTEM_PROMPT, question, retained_chunks, conversation_history,
+    )
+    logger.info(
+        "Pre-flight token estimate | repo=%d | threshold=%d | "
+        "estimated_prompt_tokens=%d | chunks=%d",
+        repository_id,
+        settings.rag_max_estimated_tokens,
+        estimated_tokens,
+        len(retained_chunks),
+    )
+
+    # Pre-flight trimming: if the estimate exceeds the safe threshold
+    # (Groq's 8k TPM limit), proactively halve the chunks (highest-scoring
+    # first — they are already sorted by score descending from apply_context_cap)
+    # *before* the first API call. Do not wait for a 413.
+    pre_flight_trimmed = False
+    while estimated_tokens > settings.rag_max_estimated_tokens and len(retained_chunks) > 1:
+        new_len = max(1, len(retained_chunks) // 2)
+        logger.warning(
+            "Estimated tokens %d exceeds threshold %d — pre-flight trimming "
+            "chunks from %d to %d (highest-scored retained first)",
+            estimated_tokens,
+            settings.rag_max_estimated_tokens,
+            len(retained_chunks),
+            new_len,
+        )
+        retained_chunks = retained_chunks[:new_len]
+        estimated_tokens = estimate_full_prompt_tokens(
+            SYSTEM_PROMPT, question, retained_chunks, conversation_history,
+        )
+        pre_flight_trimmed = True
+        logger.info(
+            "After pre-flight trim | chunks=%d | estimated_prompt_tokens=%d",
+            len(retained_chunks),
+            estimated_tokens,
+        )
+
+    if pre_flight_trimmed:
+        logger.info(
+            "Pre-flight trimming applied for repo %d: %d chunks retained, "
+            "estimated %d tokens (below threshold %d)",
+            repository_id,
+            len(retained_chunks),
+            estimated_tokens,
+            settings.rag_max_estimated_tokens,
+        )
+
     logger.debug("Prompt constructed for repo %d:\nSystem: %s\nUser: %s", repository_id, SYSTEM_PROMPT, user_prompt[:200])
 
-    # ── Step 7: Call LLM Provider (with empty-answer retry) ──────────
+    # ── Step 7: Call LLM Provider (with pre-flight trimming + retry) ──
     llm_provider = get_llm_provider()
     logger.info("Calling LLM provider '%s' for repository %d...", settings.llm_provider, repository_id)
 
@@ -266,19 +360,109 @@ async def answer_question(repository_id: int, question: str, conversation_histor
             for c in chunks
         ]
 
-    def _call_llm(chunks):
+    async def _call_llm(chunks):
         prompt = build_user_prompt(question, chunks)
-        return llm_provider.generate_answer(
+        result = await llm_provider.generate_answer(
             system_prompt=SYSTEM_PROMPT,
             user_prompt=prompt,
         )
+        # Log estimated vs actual token usage for accuracy tracking.
+        actual_prompt = None
+        actual_completion = None
+        if result.usage:
+            actual_prompt = result.usage.get("prompt_tokens")
+            actual_completion = result.usage.get("completion_tokens")
+        logger.info(
+            "Token usage | repo=%d | estimated_prompt=%d | "
+            "actual_prompt=%s | actual_completion=%s | chunks=%d",
+            repository_id,
+            estimate_full_prompt_tokens(
+                SYSTEM_PROMPT, question, chunks, conversation_history,
+            ),
+            actual_prompt,
+            actual_completion,
+            len(chunks),
+        )
+        return result
 
-    answer_text = await _call_llm(retained_chunks)
+    async def _call_llm_with_retry(chunks):
+        """Call the LLM with a 413/429 retry safety net.
+
+        - 413 (payload too large): immediately retry once with halved chunks.
+        - 429 (rate limited / TPM): wait ~60 s for the TPM window to reset,
+          then retry once.
+        If the second attempt also fails, raise a clear user-facing error
+        rather than surfacing the raw API exception.
+        """
+        try:
+            return await _call_llm(chunks)
+        except GroqAPIError as exc:
+            if exc.status_code == 413:
+                reduced = max(1, len(chunks) // 2)
+                logger.warning(
+                    "Groq 413 (payload too large) for repo %d. "
+                    "Retrying once with %d chunks (was %d)...",
+                    repository_id,
+                    reduced,
+                    len(chunks),
+                )
+                retry_chunks = chunks[:reduced]
+                try:
+                    return await _call_llm(retry_chunks)
+                except GroqAPIError:
+                    logger.error(
+                        "Groq 413 retry also failed for repo %d. Prompt too large.",
+                        repository_id,
+                    )
+                    raise HTTPException(
+                        status_code=413,
+                        detail=(
+                            "The context was too large even after automatic trimming. "
+                            "Try a more specific question or a smaller repository."
+                        ),
+                    )
+                except Exception:
+                    raise
+            elif exc.status_code == 429:
+                logger.warning(
+                    "Groq 429 (rate limited / TPM) for repo %d. "
+                    "Waiting 60 s for TPM window reset, then retrying once...",
+                    repository_id,
+                )
+                await asyncio.sleep(60)
+                try:
+                    return await _call_llm(chunks)
+                except GroqAPIError:
+                    logger.error(
+                        "Groq 429 retry also failed for repo %d.",
+                        repository_id,
+                    )
+                    raise HTTPException(
+                        status_code=429,
+                        detail=(
+                            "Rate limit exceeded. The LLM provider rejected the "
+                            "request even after waiting for the TPM window to reset. "
+                            "Please try again in a minute."
+                        ),
+                    )
+                except Exception:
+                    raise
+            else:
+                raise
+
+    result = await _call_llm_with_retry(retained_chunks)
+    answer_text = result.answer
+    actual_prompt_tokens = result.usage.get("prompt_tokens") if result.usage else None
+    actual_completion_tokens = result.usage.get("completion_tokens") if result.usage else None
     logger.info(
-        "LLM returned answer for repo %d: length=%d, empty=%s",
+        "LLM returned answer for repo %d: length=%d, empty=%s | "
+        "estimated_prompt_tokens=%d | actual_prompt_tokens=%s | actual_completion_tokens=%s",
         repository_id,
         len(answer_text),
         not bool(answer_text.strip()),
+        estimated_tokens,
+        actual_prompt_tokens,
+        actual_completion_tokens,
     )
 
     # Retry once with fewer chunks if the model returned an empty response
@@ -290,7 +474,8 @@ async def answer_question(repository_id: int, question: str, conversation_histor
             retrieval_query[:80],
         )
         reduced_chunks = retained_chunks[: max(1, len(retained_chunks) // 2)]
-        answer_text = await _call_llm(reduced_chunks)
+        result = await _call_llm_with_retry(reduced_chunks)
+        answer_text = result.answer
         logger.info(
             "LLM retry for repo %d: length=%d, empty=%s",
             repository_id,

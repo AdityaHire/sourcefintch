@@ -1,15 +1,24 @@
 import { useState } from 'react';
-import type { SourceCitation, Repository } from '../types';
+import type { SourceCitation, Repository, RepositoryFile } from '../types';
 import { Copy, Check, ExternalLink, Code2, X, FileCode } from 'lucide-react';
 
 interface CodeViewerProps {
-  citation: SourceCitation | null;
+  citation?: SourceCitation | null;
+  activeFile?: RepositoryFile | null;
   activeRepo: Repository | null;
   onClose?: () => void;
 }
 
-export default function CodeViewer({ citation, activeRepo, onClose }: CodeViewerProps) {
+export default function CodeViewer({ citation: rawCitation, activeFile, activeRepo, onClose }: CodeViewerProps) {
   const [copied, setCopied] = useState(false);
+
+  const citation: SourceCitation | null = rawCitation || (activeFile ? {
+    file_path: activeFile.file_path,
+    start_line: 1,
+    end_line: activeFile.content ? activeFile.content.split('\n').length : 1,
+    content: activeFile.content || '// Empty file',
+    score: 1,
+  } : null);
 
   if (!citation) {
     return (

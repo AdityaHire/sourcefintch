@@ -213,11 +213,11 @@ def handle_empty() -> dict:
 async def handle_conversational(message: str) -> dict:
     """Direct Groq reply using the assistant-identity prompt. No retrieval."""
     llm = get_llm_provider()
-    answer = await llm.generate_answer(
+    result = await llm.generate_answer(
         system_prompt=ASSISTANT_IDENTITY_PROMPT,
         user_prompt=message,
     )
-    return {"answer": answer, "sources": []}
+    return {"answer": result.answer, "sources": []}
 
 
 async def handle_code_query(repository_id: int, message: str, conversation_history: Optional[list] = None) -> dict:

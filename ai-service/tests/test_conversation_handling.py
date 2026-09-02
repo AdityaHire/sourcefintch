@@ -11,6 +11,7 @@ Covers:
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from app.services.llm_service import LLMResult
 from app.services.rag_service import rewrite_query
 
 
@@ -38,7 +39,7 @@ class TestQueryRewriting(IsolatedAsyncioTestCase):
             mock_settings.effective_groq_api_key = "fake-key"
             mock_settings.llm_timeout_seconds = 30
             provider = MagicMock()
-            provider.generate_answer = AsyncMock(return_value="Where is src/index.js defined?")
+            provider.generate_answer = AsyncMock(return_value=LLMResult(answer="Where is src/index.js defined?"))
             get_llm.return_value = provider
             rewritten = await rewrite_query(question, history)
         self.assertIn("src/index.js", rewritten)
