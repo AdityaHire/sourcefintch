@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: sourcefinch-ai-service
+    runtime: python
+    plan: starter
+    rootDir: ai-service
+    buildCommand: "pip install --upgrade pip && pip install -r requirements.txt"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1"
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: PIP_DISABLE_PIP_VERSION_CHECK
+        value: "1"
+      - key: LLM_PROVIDER
+        value: groq
+      - key: EMBEDDING_PROVIDER
+        value: local
+      - key: EMBEDDING_MODEL
+        value: all-MiniLM-L6-v2
+      - key: QDRANT_COLLECTION_NAME
+        value: sourcefinch_chunks
+      - key: CORS_ORIGIN
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: NODE_API_URL
+        sync: false
+      - key: INTERNAL_API_SECRET
+        sync: false

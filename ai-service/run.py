@@ -1,9 +1,8 @@
 """
-Convenience script to start the AI service.
+Convenience script to start the AI service locally.
 
-Uvicorn is the ASGI server that runs FastAPI apps — think of it as the
-equivalent of `node src/server.js`.  The "app.main:app" string tells
-uvicorn to look in app/main.py for an object named `app`.
+In production (Render) we run uvicorn directly from the start command so that
+reload/workers are off and the process is a single resident under 512 MiB.
 """
 
 import uvicorn
@@ -14,5 +13,5 @@ if __name__ == "__main__":
         "app.main:app",
         host="0.0.0.0",
         port=settings.port,
-        reload=True,  # Auto-restart on file changes (like nodemon)
+        reload=False,
     )

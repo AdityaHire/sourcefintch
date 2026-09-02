@@ -55,25 +55,35 @@ class LocalEmbeddingProvider:
     def __init__(self, model_name: Optional[str] = None):
         self.model_name = model_name or settings.embedding_model or "all-MiniLM-L6-v2"
         self._model = None
+        self._dimension: Optional[int] = None
 
     def _load_model(self):
         if self._model is None:
             from sentence_transformers import SentenceTransformer
 
-            logger.info("Loading local embedding model: %s ...", self.model_name)
-            self._model = SentenceTransformer(self.model_name)
+            logger.info("Loading local embedding model: %s on cpu ...", self.model_name)
+            # device="cpu" is mandatory on Render's 512MiB plan — there is no GPU
+            # and the CUDA wheels have already been blocked at install time.
+            self._model = SentenceTransformer(self.model_name, device="cpu")
+            # Cache the dimension once so .dimension doesn't trigger another
+            # backend call on every retrieval.
+            try:
+                self._dimension = int(self._model.get_sentence_embedding_dimension())
+            except Exception:
+                self._dimension = 384
             logger.info(
                 "Embedding model '%s' loaded successfully (dimension: %d)",
                 self.model_name,
-                self.dimension,
+                self._dimension,
             )
         return self._model
 
     @property
     def dimension(self) -> int:
-        model = self._load_model()
-        dim = model.get_sentence_embedding_dimension()
-        return int(dim) if dim is not None else 384
+        if self._dimension is not None:
+            return self._dimension
+        self._load_model()
+        return self._dimension or 384
 
     def embed(self, texts: list[str], batch_size: int = 32) -> list[list[float]]:
         if not texts:

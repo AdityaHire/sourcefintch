@@ -43,10 +43,27 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle handler."""
     logger = logging.getLogger(__name__)
     try:
+        # Ensure the Qdrant collection exists with the correct dimension for
+        # the active embedding provider.  Calling get_vector_dimension() also
+        # warms the singleton so the first request doesn't pay the model-load
+        # cost (and so a missing/incompatible model fails fast at boot).
         from app.services.vector_service import ensure_collection
-        from app.services.embedding_service import get_vector_dimension, get_active_collection_name
+        from app.services.embedding_service import (
+            get_active_collection_name,
+            get_embedding_provider,
+            get_vector_dimension,
+        )
+        provider = get_embedding_provider()
+        # For the local provider this loads sentence-transformers exactly once,
+        # on CPU.  For the Gemini provider it just constructs the SDK client.
+        _ = provider.dimension
         ensure_collection(get_active_collection_name(), get_vector_dimension())
-        logger.info("Startup vector dimension check passed for collection '%s'.", get_active_collection_name())
+        logger.info(
+            "Startup OK — provider=%s, collection='%s', dim=%d",
+            settings.embedding_provider,
+            get_active_collection_name(),
+            provider.dimension,
+        )
     except ValueError as val_err:
         logger.error("Vector dimension mismatch on startup: %s", val_err)
         raise
