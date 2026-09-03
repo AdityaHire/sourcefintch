@@ -21,12 +21,10 @@ import {
   FileJson,
   FileSpreadsheet,
   FileImage,
-  File,
   ChevronRight,
   Search,
   ChevronsUpDown,
   X,
-  Code2,
   FolderTree,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';

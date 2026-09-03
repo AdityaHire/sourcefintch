@@ -43,26 +43,34 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle handler."""
     logger = logging.getLogger(__name__)
     try:
-        # Ensure the Qdrant collection exists with the correct dimension for
-        # the active embedding provider.  Calling get_vector_dimension() also
-        # warms the singleton so the first request doesn't pay the model-load
-        # cost (and so a missing/incompatible model fails fast at boot).
         from app.services.vector_service import ensure_collection
         from app.services.embedding_service import (
+            KNOWN_LOCAL_DIMENSION,
             get_active_collection_name,
             get_embedding_provider,
-            get_vector_dimension,
         )
         provider = get_embedding_provider()
-        # For the local provider this loads sentence-transformers exactly once,
-        # on CPU.  For the Gemini provider it just constructs the SDK client.
-        _ = provider.dimension
-        ensure_collection(get_active_collection_name(), get_vector_dimension())
+
+        # CRITICAL: Do NOT touch `provider.dimension` here. For the local
+        # provider that would import sentence-transformers / transformers /
+        # torch and load the ~90 MB model weights into RAM at process start,
+        # which exhausts Render's 512 MiB plan and triggers an immediate
+        # Out-Of-Memory crash before any request is served.  The model is
+        # loaded lazily on the first embedding call instead.
+        local_dim = KNOWN_LOCAL_DIMENSION.get(
+            settings.embedding_model, KNOWN_LOCAL_DIMENSION["default"]
+        )
+        if settings.embedding_provider.lower() in ("local", "sentence-transformers"):
+            startup_dim = local_dim
+        else:
+            startup_dim = provider.dimension
+
+        ensure_collection(get_active_collection_name(), startup_dim)
         logger.info(
             "Startup OK — provider=%s, collection='%s', dim=%d",
             settings.embedding_provider,
             get_active_collection_name(),
-            provider.dimension,
+            startup_dim,
         )
     except ValueError as val_err:
         logger.error("Vector dimension mismatch on startup: %s", val_err)

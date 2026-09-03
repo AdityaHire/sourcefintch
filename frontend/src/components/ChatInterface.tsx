@@ -28,7 +28,6 @@ import {
   FolderGit2,
   Clock,
   FolderTree,
-  X,
 } from 'lucide-react';
 import {
   PromptInputBox,
@@ -283,7 +282,7 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
         sources: response.message.sources,
         created_at: new Date().toISOString(),
       };
-      setLatestAnimatedMsgId(response.message.id);
+      setLatestAnimatedMsgId(response.message.id ?? null);
       setMessages((prev) => [...prev, assistantMsg]);
 
       // Cache latest citation for Show Code inspection

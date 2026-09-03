@@ -34,6 +34,17 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
+# Known output dimensions for the local sentence-transformers models we ship.
+# Used at startup to verify the Qdrant collection dimension WITHOUT actually
+# loading the model into memory (which would OOM on Render's 512 MiB plan).
+KNOWN_LOCAL_DIMENSION: dict[str, int] = {
+    "all-MiniLM-L6-v2": 384,
+    "all-MiniLM-L12-v2": 384,
+    "all-mpnet-base-v2": 768,
+    "default": 384,
+}
+
+
 class EmbeddingProvider(Protocol):
     """Interface every embedding provider must implement."""
 

@@ -53,7 +53,10 @@ export default function Sidebar({
   const { isSignedIn, user, isLoaded: userLoaded } = useUser();
 
   // ── Expand/collapse state (Replit: hover-expand + pinned) ─────────────
-  const [isPinned, setIsPinned] = useState(false);
+  // isPinned is read below (line 74) to compute isExpanded. The setter is
+  // intentionally omitted until a pin toggle UI is added; keep the state
+  // declaration so the existing read site stays valid.
+  const [isPinned] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
