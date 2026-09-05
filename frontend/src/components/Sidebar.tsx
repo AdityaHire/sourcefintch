@@ -17,6 +17,9 @@ import {
   Home,
   MessageSquare,
   BookOpen,
+  Settings,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 export type SidebarTab = 'workspace' | 'landing';
@@ -34,6 +37,8 @@ interface SidebarProps {
   activeTab: SidebarTab;
   onNavigateTo: (tab: SidebarTab) => void;
   onOpenDocs: () => void;
+  theme?: 'light' | 'dark';
+  setTheme?: (theme: 'light' | 'dark') => void;
 }
 
 export default function Sidebar({
@@ -48,6 +53,8 @@ export default function Sidebar({
   activeTab,
   onNavigateTo,
   onOpenDocs,
+  theme,
+  setTheme,
 }: SidebarProps) {
   const api = useApiClient();
   const { isSignedIn, user, isLoaded: userLoaded } = useUser();
@@ -59,6 +66,8 @@ export default function Sidebar({
   const [isPinned] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const settingsRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Safely close user menu tracking when clicking outside Clerk dropdown
@@ -74,7 +83,21 @@ export default function Sidebar({
     return () => document.removeEventListener('click', handleDocClick);
   }, []);
 
-  const isExpanded = isPinned || isHovered || isUserMenuOpen;
+  // Safely close settings tracking when clicking outside settings card
+  useEffect(() => {
+    if (!isSettingsOpen) return;
+    const handleSettingsClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (settingsRef.current && !settingsRef.current.contains(target) && !target.closest('.settings-toggle-btn')) {
+        setIsSettingsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleSettingsClick);
+    return () => document.removeEventListener('mousedown', handleSettingsClick);
+  }, [isSettingsOpen]);
+
+  const isExpanded = isPinned || isHovered || isUserMenuOpen || isSettingsOpen;
 
   const handleMouseEnter = useCallback(() => {
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
@@ -85,12 +108,12 @@ export default function Sidebar({
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     hoverTimeoutRef.current = setTimeout(() => {
       const clerkPopup = document.querySelector('.cl-userButtonPopoverCard, .cl-modalBackdrop');
-      if (!clerkPopup) {
+      if (!clerkPopup && !isSettingsOpen) {
         setIsHovered(false);
         setIsUserMenuOpen(false);
       }
     }, 200);
-  }, []);
+  }, [isSettingsOpen]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -250,8 +273,9 @@ export default function Sidebar({
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         animate={{ width: isExpanded ? 260 : 56 }}
-        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-        className="relative hidden md:flex flex-col border-r border-zinc-200/70 dark:border-white/[0.06] bg-zinc-50/80 dark:bg-zinc-950/80 backdrop-blur-xl z-30 shrink-0 select-none h-full overflow-hidden"
+        className={`relative hidden md:flex flex-col border-r border-zinc-200/70 dark:border-white/[0.06] bg-zinc-50/80 dark:bg-zinc-950/80 backdrop-blur-xl z-30 shrink-0 select-none h-full ${
+          isExpanded ? 'overflow-visible' : 'overflow-hidden'
+        }`}
       >
         {/* ── Brand Header ───────────────────────────────────────────── */}
         <div className={`flex items-center ${isExpanded ? 'px-3 py-3 gap-2.5' : 'px-2 py-3 justify-center'} min-h-[52px]`}>
@@ -437,24 +461,55 @@ export default function Sidebar({
           )}
         </div>
 
-        {/* ── Footer: User ───────────────────────────────────────────── */}
+        {/* ── Settings Popover (Desktop) ─────────────────────────────────── */}
+        <AnimatePresence>
+          {isSettingsOpen && (
+            <div ref={settingsRef}>
+              <SettingsPopover
+                theme={theme}
+                setTheme={setTheme}
+                onOpenDocs={onOpenDocs}
+                onClose={() => setIsSettingsOpen(false)}
+                className={isExpanded ? 'left-2 right-2' : 'left-14 w-72'}
+              />
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Footer: User & Settings ──────────────────────────────────── */}
         <div className={`border-t border-zinc-200/70 dark:border-white/[0.06] ${isExpanded ? 'px-2 py-2.5' : 'px-1.5 py-2'}`}>
           {isExpanded ? (
-            <SidebarUserRowExpanded
-              isSignedIn={isSignedIn}
-              userLoaded={userLoaded}
-              imageUrl={imageUrl}
-              displayName={displayName}
-              initials={initials}
-              primaryEmail={primaryEmail}
-            />
+            <div className="flex items-center gap-1.5">
+              <div className="flex-1 min-w-0">
+                <SidebarUserRowExpanded
+                  isSignedIn={isSignedIn}
+                  userLoaded={userLoaded}
+                  imageUrl={imageUrl}
+                  displayName={displayName}
+                  initials={initials}
+                  primaryEmail={primaryEmail}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSettingsOpen((prev) => !prev)}
+                className={`settings-toggle-btn p-2 rounded-xl transition-all cursor-pointer shrink-0 ${
+                  isSettingsOpen
+                    ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white ring-1 ring-zinc-300 dark:ring-zinc-700 shadow-2xs'
+                    : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/[0.06]'
+                }`}
+                title="Settings & Appearance"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+            </div>
           ) : (
             <div className="flex justify-center">
               {isSignedIn ? (
                 <UserButton
                   afterSignOutUrl="/"
                   appearance={{
-                    elements: { avatarBox: 'h-9 w-9 rounded-xl' },
+                    elements: { avatarBox: 'h-8 w-8 rounded-xl' },
                   }}
                 />
               ) : (
@@ -462,7 +517,7 @@ export default function Sidebar({
                   <button
                     type="button"
                     title="Sign in"
-                    className="h-9 w-9 rounded-xl bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors duration-100 cursor-pointer"
+                    className="h-8 w-8 rounded-xl bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors duration-100 cursor-pointer"
                   >
                     {initials}
                   </button>
@@ -569,9 +624,38 @@ export default function Sidebar({
                 })}
               </div>
 
+              {/* ── Settings Popover (Mobile) ─────────────────────────────────── */}
+              <AnimatePresence>
+                {isSettingsOpen && (
+                  <div ref={settingsRef}>
+                    <SettingsPopover
+                      theme={theme}
+                      setTheme={setTheme}
+                      onOpenDocs={onOpenDocs}
+                      onClose={() => setIsSettingsOpen(false)}
+                      className="left-3 right-3"
+                    />
+                  </div>
+                )}
+              </AnimatePresence>
+
               {/* Mobile user footer */}
-              <div className="border-t border-zinc-200 dark:border-white/[0.06] px-3 py-2.5">
-                <SidebarUserRowExpanded isSignedIn={isSignedIn} userLoaded={userLoaded} imageUrl={imageUrl} displayName={displayName} initials={initials} primaryEmail={primaryEmail} />
+              <div className="border-t border-zinc-200 dark:border-white/[0.06] px-3 py-2.5 flex items-center justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <SidebarUserRowExpanded isSignedIn={isSignedIn} userLoaded={userLoaded} imageUrl={imageUrl} displayName={displayName} initials={initials} primaryEmail={primaryEmail} />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen((prev) => !prev)}
+                  className={`settings-toggle-btn p-2 rounded-xl transition-all cursor-pointer shrink-0 ${
+                    isSettingsOpen
+                      ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white ring-1 ring-zinc-300 dark:ring-zinc-700 shadow-2xs'
+                      : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/[0.06]'
+                  }`}
+                  title="Settings & Appearance"
+                >
+                  <Settings className="w-4 h-4" />
+                </button>
               </div>
             </motion.aside>
           </>
@@ -678,5 +762,106 @@ function SidebarUserRowExpanded({
         </div>
       </button>
     </SignInButton>
+  );
+}
+
+// ── Settings & Appearance Popover ─────────────────────────────────────────
+function SettingsPopover({
+  theme,
+  setTheme,
+  onOpenDocs,
+  onClose,
+  className = '',
+}: {
+  theme?: 'light' | 'dark';
+  setTheme?: (theme: 'light' | 'dark') => void;
+  onOpenDocs: () => void;
+  onClose: () => void;
+  className?: string;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95, y: 10 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95, y: 10 }}
+      transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+      className={`absolute bottom-16 z-50 rounded-2xl border border-zinc-200/90 dark:border-white/[0.1] bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl p-3.5 shadow-xl shadow-black/10 dark:shadow-black/40 font-sans-ui text-zinc-900 dark:text-zinc-100 select-none ${className}`}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100 dark:border-white/[0.06]">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/80 dark:border-white/[0.08] flex items-center justify-center text-zinc-700 dark:text-zinc-300">
+            <Settings className="w-3.5 h-3.5" />
+          </div>
+          <span className="text-xs font-semibold tracking-wide">Settings & Preferences</span>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-lg p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/[0.06] cursor-pointer transition-colors"
+          title="Close settings"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Appearance Section */}
+      <div className="py-3 border-b border-zinc-100 dark:border-white/[0.06]">
+        <div className="mb-2.5">
+          <div className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">Theme Mode</div>
+          <div className="text-[11px] text-zinc-400 dark:text-zinc-500">
+            {theme === 'dark' ? 'Dark mode active' : 'Light mode active'}
+          </div>
+        </div>
+
+        {/* Light / Dark Segmented Buttons */}
+        <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-zinc-100 dark:bg-white/[0.04] border border-zinc-200/60 dark:border-white/[0.04]">
+          <button
+            type="button"
+            onClick={() => setTheme?.('light')}
+            className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+              theme !== 'dark'
+                ? 'bg-white text-zinc-900 shadow-xs dark:bg-zinc-800 dark:text-white font-semibold'
+                : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
+            }`}
+          >
+            <Sun className="w-3.5 h-3.5 text-amber-500" />
+            <span>Light</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setTheme?.('dark')}
+            className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+              theme === 'dark'
+                ? 'bg-white text-zinc-900 shadow-xs dark:bg-zinc-800 dark:text-white font-semibold'
+                : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
+            }`}
+          >
+            <Moon className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Dark</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Quick Actions & Help */}
+      <div className="pt-2.5 flex flex-col gap-1">
+        <button
+          type="button"
+          onClick={() => {
+            onClose();
+            onOpenDocs();
+          }}
+          className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/[0.06] hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer text-left font-medium"
+        >
+          <BookOpen className="w-3.5 h-3.5 text-zinc-400" />
+          <span>Documentation & Guide</span>
+        </button>
+
+        <div className="flex items-center justify-between px-2 py-1 text-[11px] text-zinc-400 dark:text-zinc-500 font-sans-ui">
+          <span>Send message</span>
+          <span className="font-code text-[10px] bg-zinc-100 dark:bg-white/[0.06] px-1.5 py-0.5 rounded text-zinc-600 dark:text-zinc-300">Return ↵</span>
+        </div>
+      </div>
+    </motion.div>
   );
 }

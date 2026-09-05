@@ -5,18 +5,18 @@ import Sidebar from './Sidebar';
 import CodeViewer from './CodeViewer';
 import MarkdownRenderer from './MarkdownRenderer';
 import { ThinkingTool } from '@/components/ui/thinking-tool';
-import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { Banner } from './ui/Banner';
 import { Skeleton } from './ui/Skeleton';
 import { StatusDot } from './ui/StatusDot';
 import { useApiClient } from '../services/useApiClient';
+import RepositoryReportModal from './RepositoryReportModal';
 import type {
   Repository,
   ChatMessage,
   SourceCitation,
+  RepositoryReport,
 } from '../types';
 import {
-  Code,
   Plus,
   FileCode,
   Sparkles,
@@ -29,6 +29,7 @@ import {
   Clock,
   FolderTree,
   History,
+  ArrowRight,
 } from 'lucide-react';
 import { ConversationHistoryDrawer } from './ConversationHistoryDrawer';
 import type { Conversation } from '../types';
@@ -75,9 +76,15 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
   const [repoFiles, setRepoFiles] = useState<RepositoryFile[]>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
   const [selectedFile, setSelectedFile] = useState<RepositoryFile | null>(null);
+  const [isLoadingFileContent, setIsLoadingFileContent] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [report, setReport] = useState<RepositoryReport | null>(null);
+  const [isLoadingReport, setIsLoadingReport] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<PromptInputBoxHandle>(null);
@@ -155,9 +162,6 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
     try {
       const files = await api.getRepositoryFiles(repoId);
       setRepoFiles(files);
-      if (files.length > 0) {
-        setSelectedFile((prev) => (prev && files.some((f) => f.id === prev.id) ? prev : files[0]));
-      }
     } catch (err: any) {
       console.error('Failed to load repo files:', err);
     } finally {
@@ -165,12 +169,105 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
     }
   }, [api]);
 
+  // ── Lazy-load file content on selection ──────────────────────────────────
+  const handleSelectFile = useCallback(async (file: RepositoryFile) => {
+    // If this file already has content loaded (e.g. from a previous selection), use it directly
+    if (file.content) {
+      setSelectedFile(file);
+      return;
+    }
+    // Fetch full content from server
+    if (!selectedRepoId) return;
+    setIsLoadingFileContent(true);
+    setSelectedFile(file); // show the file immediately (without content) for UX feedback
+    try {
+      const fullFile = await api.getFileContent(selectedRepoId, file.id);
+      setSelectedFile(fullFile);
+      setRepoFiles((prev) =>
+        prev.map((f) => (f.id === file.id ? { ...f, content: fullFile.content } : f))
+      );
+    } catch (err: any) {
+      console.error('Failed to load file content:', err);
+      // Keep the metadata-only file selected so the user sees the file name
+    } finally {
+      setIsLoadingFileContent(false);
+    }
+  }, [api, selectedRepoId]);
+
   const handleToggleFileTree = () => {
     if (!isFileTreeOpen && selectedRepoId) {
       fetchRepoFiles(selectedRepoId);
     }
     setIsFileTreeOpen(!isFileTreeOpen);
     if (isCodeViewerOpen) setIsCodeViewerOpen(false);
+  };
+
+  // ── Fetch & Open Repository Intelligence Report ───────────────────────────
+  const fetchRepositoryReport = useCallback(
+    async (repoId: number, forceRefresh = false) => {
+      setIsLoadingReport(true);
+      setReportError(null);
+      try {
+        if (repoFiles.length === 0) {
+          api.getRepositoryFiles(repoId).then((files) => setRepoFiles(files)).catch(() => {});
+        }
+        const data = await api.getRepositoryReport(repoId, forceRefresh);
+        setReport(data);
+      } catch (err: any) {
+        console.error('Failed to load repository report:', err);
+        setReportError(err?.message || 'Report generation error');
+        if (repoFiles.length === 0) {
+          try {
+            const files = await api.getRepositoryFiles(repoId);
+            setRepoFiles(files);
+          } catch {}
+        }
+      } finally {
+        setIsLoadingReport(false);
+      }
+    },
+    [api, repoFiles.length]
+  );
+
+  const handleOpenReport = () => {
+    if (!selectedRepoId) return;
+    setIsReportOpen(true);
+    if (repoFiles.length === 0) {
+      fetchRepoFiles(selectedRepoId);
+    }
+    if (!report || report.repository_id !== selectedRepoId) {
+      fetchRepositoryReport(selectedRepoId);
+    }
+  };
+
+  const handleRefreshReport = () => {
+    if (!selectedRepoId) return;
+    fetchRepositoryReport(selectedRepoId, true);
+  };
+
+  const handleInspectFileFromReport = (filePath: string) => {
+    const cleanPath = filePath.replace(/^\/+/, '');
+    const match = repoFiles.find(
+      (f) => f.file_path === cleanPath || f.file_path.endsWith(cleanPath) || cleanPath.endsWith(f.file_path)
+    );
+
+    if (match) {
+      handleSelectFile(match);
+      setSelectedCitation(null);
+      setIsCodeViewerOpen(true);
+    } else if (selectedRepoId) {
+      api.getRepositoryFiles(selectedRepoId).then((files) => {
+        setRepoFiles(files);
+        const fileMatch = files.find(
+          (f) => f.file_path === cleanPath || f.file_path.endsWith(cleanPath) || cleanPath.endsWith(f.file_path)
+        );
+        if (fileMatch) {
+          handleSelectFile(fileMatch);
+          setSelectedCitation(null);
+          setIsCodeViewerOpen(true);
+        }
+      });
+    }
   };
 
   // ── Switch repository ─────────────────────────────────────────────────────
@@ -183,6 +280,8 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
     setIsFileTreeOpen(false);
     setRepoFiles([]);
     setSelectedFile(null);
+    setReport(null);
+    setIsReportOpen(false);
     setErrorMessage(null);
 
     const url = new URL(window.location.href);
@@ -328,6 +427,7 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
     if (!userText || !selectedRepoId || isSubmitting) return;
 
     setErrorMessage(null);
+    setSuggestedQuestions([]);
 
     const optimisticUserMsg: ChatMessage = {
       id: Date.now(),
@@ -399,6 +499,9 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
           onError: (err) => {
             setErrorMessage(err);
           },
+          onSuggestions: (questions) => {
+            setSuggestedQuestions(questions);
+          },
         }
       );
     } catch (err: any) {
@@ -412,6 +515,36 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
       );
     } finally {
       setIsSubmitting(false);
+      setSuggestedQuestions((prev) => {
+        if (prev && prev.length > 0) return prev;
+        const qLower = (userText || '').toLowerCase();
+        if (qLower.includes('auth') || qLower.includes('login') || qLower.includes('user') || qLower.includes('clerk')) {
+          return [
+            'How is user session validation handled?',
+            'Where are protected routes configured?',
+            'What auth tokens are passed in API requests?',
+          ];
+        }
+        if (qLower.includes('api') || qLower.includes('route') || qLower.includes('endpoint') || qLower.includes('controller')) {
+          return [
+            'What validation middleware protects these endpoints?',
+            'How are API error responses formatted?',
+            'Are these routes rate-limited?',
+          ];
+        }
+        if (qLower.includes('db') || qLower.includes('database') || qLower.includes('sql') || qLower.includes('table') || qLower.includes('model')) {
+          return [
+            'How are database connection pools configured?',
+            'What indexes are defined for this model?',
+            'Can you show the database schema for this table?',
+          ];
+        }
+        return [
+          'How does this connect with the rest of the application?',
+          'What are the primary entry points for this feature?',
+          'What are potential edge cases or performance considerations?',
+        ];
+      });
       composerRef.current?.focus();
     }
   };
@@ -507,6 +640,8 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
         activeTab={activeTab}
         onNavigateTo={onNavigateTo}
         onOpenDocs={onOpenDocs}
+        theme={theme}
+        setTheme={setTheme}
       />
 
       {/* ── 2. CENTER PANEL: Chat Workspace ───────────────────────────────── */}
@@ -563,32 +698,6 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
               <span>{isFileTreeOpen ? 'Hide Files' : 'Files'}</span>
             </button>
 
-            {/* Show Code toggle button */}
-            <button
-              type="button"
-              onClick={() => {
-                if (!isCodeViewerOpen && !selectedCitation) {
-                  for (let i = messages.length - 1; i >= 0; i--) {
-                    if (messages[i].sources && messages[i].sources!.length > 0) {
-                      setSelectedCitation(messages[i].sources![0]);
-                      break;
-                    }
-                  }
-                }
-                if (isFileTreeOpen) setIsFileTreeOpen(false);
-                setIsCodeViewerOpen(!isCodeViewerOpen);
-              }}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer shadow-xs font-sans-ui ${
-                isCodeViewerOpen
-                  ? 'bg-zinc-900 dark:bg-white/15 text-white ring-1 ring-zinc-700 dark:ring-white/10 hover:bg-zinc-800 dark:hover:bg-white/20'
-                  : 'bg-zinc-100 dark:bg-white/[0.06] text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-white/10 hover:text-zinc-900 dark:hover:text-white'
-              }`}
-              title={isCodeViewerOpen ? 'Hide code viewer' : 'Show code viewer'}
-            >
-              <Code className="w-3.5 h-3.5" />
-              <span>{isCodeViewerOpen ? 'Hide Code' : 'Show Code'}</span>
-            </button>
-
             {/* History toggle button */}
             <button
               type="button"
@@ -610,6 +719,22 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
               )}
             </button>
 
+            {/* Intelligence Report button */}
+            <button
+              type="button"
+              onClick={handleOpenReport}
+              disabled={!selectedRepoId}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer shadow-xs font-sans-ui disabled:opacity-40 disabled:cursor-not-allowed ${
+                isReportOpen
+                  ? 'bg-purple-900/40 text-purple-200 ring-1 ring-purple-500/50'
+                  : 'bg-purple-500/10 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 hover:bg-purple-500/20 dark:hover:bg-purple-500/25 border border-purple-500/30'
+              }`}
+              title="View full repository intelligence report"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+              <span>Report</span>
+            </button>
+
             {/* Primary Action: + New Chat */}
             <button
               type="button"
@@ -620,12 +745,6 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
               <Plus className="w-3.5 h-3.5" />
               <span>New Chat</span>
             </button>
-
-            {/* Theme toggle — sits beside the New Chat action */}
-            <ThemeToggle
-              isDark={theme === 'dark'}
-              onToggle={(isDark) => setTheme(isDark ? 'dark' : 'light')}
-            />
           </div>
         </div>
 
@@ -792,6 +911,42 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
                 );
               })}
 
+              {/* ── Suggested Follow-up Questions ──────────────────────── */}
+              {suggestedQuestions.length > 0 && !isSubmitting && messages.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.35, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+                  className="pt-3 pb-1 max-w-[72ch]"
+                >
+                  <div className="flex items-center gap-1.5 mb-2 px-0.5">
+                    <Sparkles className="w-3 h-3 text-orange-500" />
+                    <span className="text-[10.5px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider font-sans-ui">
+                      Follow up
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {suggestedQuestions.map((q, qIdx) => (
+                      <button
+                        key={qIdx}
+                        type="button"
+                        onClick={() => {
+                          setSuggestedQuestions([]);
+                          handleSendMessage(q);
+                        }}
+                        disabled={!selectedRepoId || isSubmitting}
+                        className="group flex items-center gap-2.5 rounded-xl border border-zinc-200/80 dark:border-white/[0.06] bg-white/60 dark:bg-white/[0.02] px-3.5 py-2 text-left text-[12.5px] text-zinc-700 dark:text-zinc-300 hover:border-orange-500/40 hover:bg-orange-500/[0.04] hover:text-zinc-900 dark:hover:text-white transition-all cursor-pointer font-sans-ui disabled:opacity-50 shadow-2xs"
+                      >
+                        <div className="w-5 h-5 rounded-md bg-zinc-100 dark:bg-white/[0.06] flex items-center justify-center shrink-0 group-hover:bg-orange-500/10 transition-colors">
+                          <ArrowRight className="w-3 h-3 text-zinc-500 dark:text-zinc-400 group-hover:text-orange-500 transition-colors" />
+                        </div>
+                        <span className="font-medium">{q}</span>
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+
               {/* ── Minimal thinking indicator while generating ──────────── */}
               {isSubmitting && (
                 <div className="flex items-center gap-1.5 text-[11.5px] font-sans-ui text-zinc-500 dark:text-zinc-400 pt-2">
@@ -872,7 +1027,7 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
                 isLoading={isLoadingFiles}
                 repoName={activeRepo?.name}
                 selectedPath={selectedFile?.file_path}
-                onSelectFile={(file) => setSelectedFile(file)}
+                onSelectFile={(file) => handleSelectFile(file)}
               />
             </div>
 
@@ -881,6 +1036,7 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
               <CodeViewer
                 activeFile={selectedFile}
                 activeRepo={activeRepo}
+                isLoading={isLoadingFileContent}
                 onClose={() => setIsFileTreeOpen(false)}
                 onAskAI={handleAskAIFromCode}
               />
@@ -903,6 +1059,27 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
         isLoading={isLoadingHistory}
         repoName={activeRepo?.name}
       />
+
+      {/* ── Repository Intelligence Report Modal ──────────────────────── */}
+      {isReportOpen && (
+        <RepositoryReportModal
+          report={report}
+          isLoading={isLoadingReport}
+          errorMessage={reportError}
+          activeRepo={activeRepo}
+          repoFiles={repoFiles}
+          onClose={() => setIsReportOpen(false)}
+          onRefresh={handleRefreshReport}
+          onAskAI={(prompt) => {
+            setIsReportOpen(false);
+            handleSendMessage(prompt);
+          }}
+          onInspectFile={(filePath) => {
+            setIsReportOpen(false);
+            handleInspectFileFromReport(filePath);
+          }}
+        />
+      )}
     </div>
   );
 }

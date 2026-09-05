@@ -208,7 +208,16 @@ const processFiles = async (repositoryId, cloneDir) => {
           config.ingestion.maxFileSizeBytes || MAX_INGESTION_FILE_BYTES,
           MAX_INGESTION_FILE_BYTES
         );
-        if (stats.size > maxBytes || stats.size === 0) {
+        if (stats.size > maxBytes) {
+          continue;
+        }
+
+        // Read actual file content from disk
+        let content = '';
+        try {
+          content = fs.readFileSync(fullPath, 'utf-8');
+        } catch {
+          // If we can't read the file (e.g. encoding issues), skip it
           continue;
         }
 
@@ -219,6 +228,7 @@ const processFiles = async (repositoryId, cloneDir) => {
           filePath: relativePath,
           language: detectLanguage(entry.name),
           fileSize: stats.size,
+          content,
         });
       }
     }

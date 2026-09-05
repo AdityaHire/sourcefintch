@@ -83,3 +83,71 @@ export interface ChatResponse {
   };
   persistence_warning?: boolean;
 }
+
+/** Repository Intelligence Report types */
+export interface LanguageMetric {
+  language: string;
+  file_count: number;
+  line_count: number;
+  byte_size: number;
+  percentage: number;
+  color: string;
+}
+
+export interface DependencyInfo {
+  name: string;
+  version: string;
+  type: 'runtime' | 'dev';
+  category: string;
+}
+
+export interface EntryPoint {
+  file_path: string;
+  name: string;
+  language: string;
+  description: string;
+}
+
+export interface DirectoryInfo {
+  path: string;
+  file_count: number;
+  description: string;
+}
+
+export interface DetectedApi {
+  method: string;
+  path: string;
+  file: string;
+}
+
+export interface AIAnalysis {
+  executive_summary: string;
+  architecture_style: string;
+  architecture_deep_dive: string;
+  key_features: Array<{ title: string; description: string }>;
+  security_and_performance: Array<{ aspect: string; observation: string; recommendation?: string }>;
+  onboarding_guide: Array<{ step: number; title: string; detail: string }>;
+  recommended_questions: string[];
+}
+
+export interface RepositoryReport {
+  repository_id: number;
+  repo_name: string;
+  owner: string;
+  github_url: string;
+  branch: string;
+  generated_at: string;
+  metrics: {
+    total_files: number;
+    total_lines: number;
+    total_size_bytes: number;
+    languages: LanguageMetric[];
+  };
+  manifests: string[];
+  dependencies: DependencyInfo[];
+  scripts: Record<string, string>;
+  entry_points: EntryPoint[];
+  key_directories: DirectoryInfo[];
+  detected_apis: DetectedApi[];
+  ai_analysis: AIAnalysis;
+}

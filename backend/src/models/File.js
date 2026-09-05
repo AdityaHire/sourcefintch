@@ -66,10 +66,24 @@ const findById = async (id) => {
   return rows[0] || null;
 };
 
+/**
+ * Returns metadata-only listing (no content column) for fast sidebar / tree views.
+ */
 const findByRepositoryId = async (repositoryId) => {
-  const sql = 'SELECT * FROM files WHERE repository_id = ? ORDER BY file_path';
+  const sql = 'SELECT id, repository_id, file_path, language, file_size FROM files WHERE repository_id = ? ORDER BY file_path';
   const [rows] = await pool.execute(sql, sqlParams([repositoryId]));
   return rows;
+};
+
+const findByRepoAndPath = async (repositoryId, filePath) => {
+  const sql = 'SELECT * FROM files WHERE repository_id = ? AND file_path = ? LIMIT 1';
+  const [rows] = await pool.execute(sql, sqlParams([repositoryId, filePath]));
+  return rows[0] || null;
+};
+
+const updateContent = async (id, content) => {
+  const sql = 'UPDATE files SET content = ? WHERE id = ?';
+  await pool.execute(sql, sqlParams([content, id]));
 };
 
 // ── DELETE ──────────────────────────────────────────────────────────────────
@@ -80,4 +94,12 @@ const remove = async (id) => {
   return result.affectedRows > 0;
 };
 
-module.exports = { create, createMany, findById, findByRepositoryId, remove };
+module.exports = {
+  create,
+  createMany,
+  findById,
+  findByRepositoryId,
+  findByRepoAndPath,
+  updateContent,
+  remove,
+};

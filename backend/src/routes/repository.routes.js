@@ -20,6 +20,8 @@ const {
   createRepository,
   getRepository,
   getRepositoryFiles,
+  getFileContent,
+  getRepositoryReport,
   updateRepositoryStatus,
   deleteRepositoryChunks,
   deleteRepository,
@@ -39,8 +41,15 @@ router.get('/:id', requireAuthOrInternal, getRepository);
 // DELETE /api/repositories/:id
 router.delete('/:id', requireAuth, deleteRepository);
 
-// GET /api/repositories/:id/files — Frontend and AI service
+// GET /api/repositories/:id/files — File list (metadata only, no content)
 router.get('/:id/files', requireAuthOrInternal, getRepositoryFiles);
+
+// GET /api/repositories/:id/files/:fileId — Single file with full content
+router.get('/:id/files/:fileId', requireAuthOrInternal, getFileContent);
+
+// GET & POST /api/repositories/:id/report — Full Repository Intelligence Report
+router.get('/:id/report', requireAuthOrInternal, getRepositoryReport);
+router.post('/:id/report', requireAuthOrInternal, getRepositoryReport);
 
 // PATCH /api/repositories/:id/status — AI service only
 router.patch('/:id/status', requireInternalSecret, updateRepositoryStatus);

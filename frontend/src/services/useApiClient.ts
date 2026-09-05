@@ -62,6 +62,10 @@ export function useApiClient() {
         api.createRepository(authedFetch, githubUrl, branch),
       getRepository: (id: number) => api.getRepository(authedFetch, id),
       getRepositoryFiles: (id: number) => api.getRepositoryFiles(authedFetch, id),
+      getFileContent: (repoId: number, fileId: number) =>
+        api.getFileContent(authedFetch, repoId, fileId),
+      getRepositoryReport: (id: number, forceRefresh?: boolean) =>
+        api.getRepositoryReport(authedFetch, id, forceRefresh),
       deleteRepository: (id: number) => api.deleteRepository(authedFetch, id),
       sendChatMessage: (payload: Parameters<typeof api.sendChatMessage>[1]) =>
         api.sendChatMessage(authedFetch, payload),

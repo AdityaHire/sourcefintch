@@ -341,6 +341,14 @@ async def route_message_stream(
             yield {"type": "error", "content": str(exc)}
             return
         yield {"type": "done"}
+        yield {
+            "type": "suggestions",
+            "questions": [
+                "What is the main architecture of this repository?",
+                "Which frameworks and entry points are used?",
+                "Can you walk me through the key files?",
+            ],
+        }
         return
 
     if category == MessageCategory.CODE_QUERY:
@@ -352,6 +360,14 @@ async def route_message_stream(
         yield {"type": "citations", "sources": []}
         yield {"type": "token", "content": OFF_TOPIC_REDIRECT}
         yield {"type": "done"}
+        yield {
+            "type": "suggestions",
+            "questions": [
+                "How is this project structured?",
+                "What dependencies are configured?",
+                "Explain the primary API routes.",
+            ],
+        }
         return
 
     if category == MessageCategory.AMBIGUOUS:
@@ -359,12 +375,28 @@ async def route_message_stream(
         yield {"type": "citations", "sources": []}
         yield {"type": "token", "content": AMBIGUOUS_CLARIFY.format(repo=repo_name)}
         yield {"type": "done"}
+        yield {
+            "type": "suggestions",
+            "questions": [
+                f"Explain the architecture of {repo_name}",
+                f"What are the main entry points in {repo_name}?",
+                f"How is data managed in {repo_name}?",
+            ],
+        }
         return
 
     if category == MessageCategory.META_COMMAND:
         yield {"type": "citations", "sources": []}
         yield {"type": "token", "content": handle_meta_command(message)["answer"]}
         yield {"type": "done"}
+        yield {
+            "type": "suggestions",
+            "questions": [
+                "How does the RAG retrieval pipeline work?",
+                "What models and embeddings are used?",
+                "Show me the available API endpoints.",
+            ],
+        }
         return
 
     # Fallback to code query stream

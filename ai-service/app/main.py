@@ -29,6 +29,7 @@ from app.config import settings
 from app.api.health import router as health_router
 from app.api.indexing import router as indexing_router
 from app.api.chat import router as chat_router
+from app.api.report import router as report_router
 
 # Configure logging for the whole app
 logging.basicConfig(
@@ -175,4 +176,5 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 app.include_router(health_router)
 app.include_router(indexing_router)
 app.include_router(chat_router)
+app.include_router(report_router)
 

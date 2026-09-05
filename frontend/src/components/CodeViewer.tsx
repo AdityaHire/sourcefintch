@@ -19,6 +19,7 @@ interface CodeViewerProps {
   citation?: SourceCitation | null;
   activeFile?: RepositoryFile | null;
   activeRepo: Repository | null;
+  isLoading?: boolean;
   onClose?: () => void;
   onAskAI?: (prompt: string, autoSend?: boolean) => void;
 }
@@ -27,6 +28,7 @@ export default function CodeViewer({
   citation: rawCitation,
   activeFile,
   activeRepo,
+  isLoading,
   onClose,
   onAskAI,
 }: CodeViewerProps) {
@@ -41,10 +43,39 @@ export default function CodeViewer({
           file_path: activeFile.file_path,
           start_line: 1,
           end_line: activeFile.content ? activeFile.content.split('\n').length : 1,
-          content: activeFile.content || '// Empty file',
+          content: activeFile.content !== undefined && activeFile.content !== null ? activeFile.content : '',
           score: 1,
         }
       : null);
+
+  // Show loading skeleton while content is being fetched
+  if (isLoading && activeFile && !activeFile.content) {
+    return (
+      <div className="flex h-full w-full flex-col border-l border-zinc-200/80 dark:border-zinc-800/60 bg-white/50 dark:bg-zinc-950/60 backdrop-blur-md font-sans-ui select-none">
+        <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/70 dark:bg-zinc-900/50 px-4 py-2.5 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center">
+              <FileCode className="w-3.5 h-3.5 text-zinc-400" />
+            </div>
+            <span className="text-[13px] font-semibold text-zinc-900 dark:text-white font-code">{activeFile.file_path}</span>
+          </div>
+          {onClose && (
+            <button type="button" onClick={onClose} className="flex items-center gap-1 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 px-2.5 py-1 text-xs font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-all cursor-pointer shadow-xs">
+              <X className="w-3.5 h-3.5" /><span>Back to Chat</span>
+            </button>
+          )}
+        </div>
+        <div className="flex-1 flex flex-col gap-2 p-4">
+          {Array.from({ length: 20 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <div className="w-8 h-4 rounded bg-zinc-200/60 dark:bg-zinc-800/60 animate-pulse" />
+              <div className="h-4 rounded bg-zinc-200/60 dark:bg-zinc-800/60 animate-pulse" style={{ width: `${30 + Math.random() * 60}%` }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (!citation) {
     return (
@@ -172,11 +203,21 @@ export default function CodeViewer({
               {citation.file_path}
             </div>
             <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 dark:text-zinc-400 font-code">
-              <span>
-                Lines {citation.start_line}–{citation.end_line}
-              </span>
-              <span className="text-zinc-300 dark:text-zinc-700">·</span>
-              <span className="text-zinc-600 dark:text-zinc-400 font-medium">{scorePct}% relevance</span>
+              {activeFile ? (
+                <span>
+                  {lines.length} {lines.length === 1 ? 'line' : 'lines'}
+                  {activeFile.language ? ` · ${activeFile.language}` : ''}
+                  {activeFile.file_size ? ` · ${(activeFile.file_size / 1024).toFixed(1)} KB` : ''}
+                </span>
+              ) : (
+                <>
+                  <span>
+                    Lines {citation.start_line}–{citation.end_line}
+                  </span>
+                  <span className="text-zinc-300 dark:text-zinc-700">·</span>
+                  <span className="text-zinc-600 dark:text-zinc-400 font-medium">{scorePct}% relevance</span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -335,50 +376,60 @@ export default function CodeViewer({
 
       {/* ── Line-Numbered Code Inspector ─────────────────────────────────── */}
       <div className="flex-1 overflow-auto bg-white/40 dark:bg-transparent p-0 font-code text-[12.5px] select-text">
-        <div className="table w-full border-collapse">
-          {lines.map((lineText, idx) => {
-            const currentLineNumber = (citation.start_line || 1) + idx;
-            const isLineSelected =
-              selectedRange &&
-              currentLineNumber >= selectedRange[0] &&
-              currentLineNumber <= selectedRange[1];
+        {lines.length === 0 || (lines.length === 1 && !lines[0].trim() && (!activeFile?.content || activeFile.content.length === 0)) ? (
+          <div className="flex flex-col items-center justify-center h-64 text-zinc-400 dark:text-zinc-500 font-sans-ui p-6 text-center select-none">
+            <FileCode className="w-10 h-10 mb-2 opacity-30 text-zinc-400" />
+            <span className="font-semibold text-sm text-zinc-600 dark:text-zinc-300">Empty file</span>
+            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1 max-w-xs">
+              This file contains no lines or characters.
+            </p>
+          </div>
+        ) : (
+          <div className="table w-full border-collapse">
+            {lines.map((lineText, idx) => {
+              const currentLineNumber = (citation.start_line || 1) + idx;
+              const isLineSelected =
+                selectedRange &&
+                currentLineNumber >= selectedRange[0] &&
+                currentLineNumber <= selectedRange[1];
 
-            return (
-              <div
-                key={idx}
-                className={`table-row transition-colors ${
-                  isLineSelected
-                    ? 'bg-purple-500/10 dark:bg-purple-500/15'
-                    : 'hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30'
-                }`}
-              >
-                {/* Line number gutter with click-to-select */}
-                <span
-                  onClick={(e) => handleLineClick(currentLineNumber, e)}
-                  title="Click to select line, Shift+click for range"
-                  className={`table-cell select-none pr-3 text-right w-12 py-0.5 pl-4 border-r leading-5 cursor-pointer transition-colors ${
+              return (
+                <div
+                  key={idx}
+                  className={`table-row transition-colors ${
                     isLineSelected
-                      ? 'border-purple-400 dark:border-purple-500 text-purple-600 dark:text-purple-400 font-bold bg-purple-500/15 dark:bg-purple-500/20'
-                      : 'border-zinc-100 dark:border-zinc-800/80 text-zinc-400 dark:text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-300 bg-zinc-50/20 dark:bg-transparent'
+                      ? 'bg-purple-500/10 dark:bg-purple-500/15'
+                      : 'hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30'
                   }`}
                 >
-                  {currentLineNumber}
-                </span>
+                  {/* Line number gutter with click-to-select */}
+                  <span
+                    onClick={(e) => handleLineClick(currentLineNumber, e)}
+                    title="Click to select line, Shift+click for range"
+                    className={`table-cell select-none pr-3 text-right w-12 py-0.5 pl-4 border-r leading-5 cursor-pointer transition-colors ${
+                      isLineSelected
+                        ? 'border-purple-400 dark:border-purple-500 text-purple-600 dark:text-purple-400 font-bold bg-purple-500/15 dark:bg-purple-500/20'
+                        : 'border-zinc-100 dark:border-zinc-800/80 text-zinc-400 dark:text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-300 bg-zinc-50/20 dark:bg-transparent'
+                    }`}
+                  >
+                    {currentLineNumber}
+                  </span>
 
-                {/* Line code content */}
-                <span
-                  className={`table-cell pl-4 whitespace-pre py-0.5 leading-5 font-code ${
-                    isLineSelected
-                      ? 'text-zinc-950 dark:text-white font-medium'
-                      : 'text-zinc-800 dark:text-zinc-200'
-                  }`}
-                >
-                  {lineText || ' '}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+                  {/* Line code content */}
+                  <span
+                    className={`table-cell pl-4 whitespace-pre py-0.5 leading-5 font-code ${
+                      isLineSelected
+                        ? 'text-zinc-950 dark:text-white font-medium'
+                        : 'text-zinc-800 dark:text-zinc-200'
+                    }`}
+                  >
+                    {lineText || ' '}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

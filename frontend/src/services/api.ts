@@ -159,6 +159,33 @@ export async function getRepositoryFiles(
   return jsonOrThrow(res, 'Failed to fetch repository files');
 }
 
+/**
+ * Fetch a single file's full content (lazy-loaded on file selection).
+ */
+export async function getFileContent(
+  authedFetch: AuthedFetch,
+  repoId: number,
+  fileId: number
+): Promise<import('../types').RepositoryFile> {
+  const res = await authedFetch(apiUrl(`/api/repositories/${repoId}/files/${fileId}`));
+  return jsonOrThrow(res, 'Failed to fetch file content');
+}
+
+export async function getRepositoryReport(
+  authedFetch: AuthedFetch,
+  id: number,
+  forceRefresh?: boolean
+): Promise<import('../types').RepositoryReport> {
+  const endpoint = forceRefresh
+    ? apiUrl(`/api/repositories/${id}/report?refresh=true`)
+    : apiUrl(`/api/repositories/${id}/report`);
+  const res = await authedFetch(endpoint, {
+    method: forceRefresh ? 'POST' : 'GET',
+    ...(forceRefresh ? { body: JSON.stringify({ force_refresh: true }) } : {}),
+  });
+  return jsonOrThrow(res, 'Failed to fetch repository intelligence report');
+}
+
 export async function sendChatMessage(
   authedFetch: AuthedFetch,
   payload: {
@@ -188,6 +215,7 @@ export async function streamChatMessage(
     onCitations?: (citations: import('../types').SourceCitation[]) => void;
     onToken?: (token: string) => void;
     onSaved?: (messageId: number) => void;
+    onSuggestions?: (questions: string[]) => void;
     onError?: (error: string) => void;
   },
   signal?: AbortSignal
@@ -237,6 +265,8 @@ export async function streamChatMessage(
           callbacks.onToken?.(event.content);
         } else if (event.type === 'saved' && event.message_id) {
           callbacks.onSaved?.(event.message_id);
+        } else if (event.type === 'suggestions' && event.questions) {
+          callbacks.onSuggestions?.(event.questions);
         } else if (event.type === 'error' && event.content) {
           callbacks.onError?.(event.content);
         }

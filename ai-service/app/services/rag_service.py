@@ -505,6 +505,59 @@ async def answer_question(repository_id: int, question: str, conversation_histor
     }
 
 
+FOLLOW_UP_SYSTEM = (
+    "You generate concise follow-up questions for a code-analysis AI assistant. "
+    "Given the user's original question and the AI's answer about a software repository, "
+    "suggest exactly 3 short, natural follow-up questions the user might want to ask next. "
+    "Each question should be specific, actionable, and different from the others. "
+    "Output ONLY a JSON array of 3 strings, nothing else. Example: "
+    '[\"How is error handling done in this module?\", \"What tests cover this function?\", \"Are there any performance concerns?\"]'
+)
+
+
+async def _generate_follow_up_suggestions(question: str, answer: str) -> list[str]:
+    """Generate 3 context-aware follow-up questions using a fast LLM call.
+
+    Returns a list of up to 3 question strings, or an empty list on failure.
+    This is best-effort — failures are logged but never propagated.
+    """
+    if not answer or not answer.strip():
+        return []
+
+    # Truncate long answers to keep the suggestion call fast and cheap
+    truncated_answer = answer[:2000] if len(answer) > 2000 else answer
+
+    user_content = (
+        f"User's question:\n{question}\n\n"
+        f"AI's answer:\n{truncated_answer}\n\n"
+        f"Generate 3 follow-up questions:"
+    )
+
+    try:
+        llm = get_llm_provider()
+        result = await llm.generate_answer(
+            system_prompt=FOLLOW_UP_SYSTEM,
+            user_prompt=user_content,
+        )
+        if result and result.answer:
+            # Parse JSON array from the response
+            raw = result.answer.strip()
+            # Handle cases where model wraps in markdown code block
+            if raw.startswith("```"):
+                raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                # Take up to 3, ensure they're strings
+                return [str(q).strip() for q in parsed[:3] if q and str(q).strip()]
+        return []
+    except json.JSONDecodeError as exc:
+        logger.warning("Failed to parse follow-up suggestions JSON: %s", exc)
+        return []
+    except Exception as exc:
+        logger.warning("Follow-up suggestion generation failed (non-fatal): %s", exc)
+        return []
+
+
 async def stream_question(
     repository_id: int,
     question: str,
@@ -585,8 +638,10 @@ async def stream_question(
     # Step 7: Stream tokens
     user_prompt = build_user_prompt(question, retained_chunks)
     llm_provider = get_llm_provider()
+    full_answer_tokens: list[str] = []
     try:
         async for token in llm_provider.stream_answer(system_prompt=SYSTEM_PROMPT, user_prompt=user_prompt):
+            full_answer_tokens.append(token)
             yield {"type": "token", "content": token}
     except Exception as exc:
         logger.error("Error during streaming generation for repo %d: %s", repository_id, exc)
@@ -594,4 +649,11 @@ async def stream_question(
         return
 
     yield {"type": "done"}
+
+    # Step 8: Generate follow-up suggestions (fire-and-forget, non-blocking)
+    full_answer = "".join(full_answer_tokens)
+    suggestions = await _generate_follow_up_suggestions(question, full_answer)
+    if not suggestions:
+        suggestions = _fallback_follow_up_suggestions(question)
+    yield {"type": "suggestions", "questions": suggestions}
 
