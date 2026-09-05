@@ -466,6 +466,18 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
     setIsCodeViewerOpen(true);
   };
 
+  const handleAskAIFromCode = (prompt: string, autoSend: boolean = true) => {
+    setIsCodeViewerOpen(false);
+    setIsFileTreeOpen(false);
+
+    if (autoSend) {
+      handleSendMessage(prompt);
+    } else {
+      composerRef.current?.setText(prompt);
+      composerRef.current?.focus();
+    }
+  };
+
   const activeRepo = useMemo(
     () => repositories.find((r) => r.id === selectedRepoId) || null,
     [repositories, selectedRepoId]
@@ -835,6 +847,7 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
               citation={selectedCitation}
               activeRepo={activeRepo}
               onClose={() => setIsCodeViewerOpen(false)}
+              onAskAI={handleAskAIFromCode}
             />
           </motion.div>
         )}
@@ -869,6 +882,7 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
                 activeFile={selectedFile}
                 activeRepo={activeRepo}
                 onClose={() => setIsFileTreeOpen(false)}
+                onAskAI={handleAskAIFromCode}
               />
             </div>
           </motion.div>

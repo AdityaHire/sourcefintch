@@ -48,6 +48,8 @@ export interface PromptInputBoxHandle {
   focus: () => void;
   /** Clear the textarea and reset its height. */
   clear: () => void;
+  /** Set the textarea value programmatically and focus it. */
+  setText: (text: string) => void;
 }
 
 export const PromptInputBox = forwardRef<PromptInputBoxHandle, PromptInputBoxProps>(
@@ -87,6 +89,13 @@ export const PromptInputBox = forwardRef<PromptInputBoxHandle, PromptInputBoxPro
         clear: () => {
           setValue('');
           requestAnimationFrame(adjustHeight);
+        },
+        setText: (text: string) => {
+          setValue(text);
+          requestAnimationFrame(() => {
+            adjustHeight();
+            taRef.current?.focus();
+          });
         },
       }),
       [adjustHeight]
