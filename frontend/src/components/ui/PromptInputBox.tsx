@@ -21,8 +21,8 @@ import {
 import { ArrowUp, Square, Loader2, Plus, Sparkles } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
-const MAX_HEIGHT = 160; // px
-const MIN_HEIGHT = 38; // px
+const MAX_HEIGHT = 80; // px
+const MIN_HEIGHT = 10; // px
 
 export type ComposerStatus = 'idle' | 'sending' | 'streaming';
 
@@ -145,7 +145,7 @@ export const PromptInputBox = forwardRef<PromptInputBoxHandle, PromptInputBoxPro
           'transition-[border-color,box-shadow] duration-150 ease-out',
           'focus-within:border-zinc-400 dark:focus-within:border-zinc-600',
           'focus-within:ring-2 focus-within:ring-zinc-400/15 dark:focus-within:ring-white/10',
-          'p-3',
+          'p-2',
           className
         )}
       >

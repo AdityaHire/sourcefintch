@@ -14,11 +14,11 @@ const { ingestRepository } = require('../services/ingestionService');
 const Repository = require('../models/Repository');
 const File = require('../models/File');
 const CodeChunk = require('../models/CodeChunk');
+const RepositoryReport = require('../models/RepositoryReport');
 const { getAuth } = require('@clerk/express');
 const config = require('../config/environment');
 
-// In-memory cache for intelligence reports: repository_id -> { report, timestamp }
-const reportCache = new Map();
+// In-memory cache removed in favor of MySQL-backed persistence
 
 const VALID_STATUSES = [
   'pending',
@@ -143,7 +143,10 @@ const getRepositoryFiles = async (req, res, next) => {
       throw err;
     }
 
-    const files = await File.findByRepositoryId(id);
+    const includeContent = req.query.include_content === 'true';
+    const files = includeContent 
+      ? await File.findByRepositoryIdWithContent(id)
+      : await File.findByRepositoryId(id);
     res.json(files);
   } catch (error) {
     next(error);
@@ -313,7 +316,7 @@ const deleteRepository = async (req, res, next) => {
       // Ignore if no chunks
     }
 
-    reportCache.delete(Number(id));
+    await RepositoryReport.deleteByRepositoryId(id);
     await Repository.remove(id);
     res.json({
       success: true,
@@ -331,6 +334,8 @@ const getRepositoryReport = async (req, res, next) => {
     const forceRefresh = req.query.refresh === 'true' || req.body?.force_refresh === true;
     const repoIdNum = Number(id);
 
+    const REPORT_COOLDOWN_MS = 15 * 60 * 1000;
+
     // 1. Verify repository exists
     const repository = await Repository.findById(repoIdNum);
     if (!repository) {
@@ -339,12 +344,25 @@ const getRepositoryReport = async (req, res, next) => {
       throw err;
     }
 
-    // 2. Check cached report if not forcing refresh
-    if (!forceRefresh && reportCache.has(repoIdNum)) {
-      return res.json(reportCache.get(repoIdNum).report);
+    // 2. Enforce cooldown on force refresh
+    if (forceRefresh) {
+      const lastReport = await RepositoryReport.findByRepositoryIdRaw(repoIdNum);
+      if (lastReport && (Date.now() - new Date(lastReport.generated_at).getTime() < REPORT_COOLDOWN_MS)) {
+        const err = new Error('Report was recently generated. Please wait before regenerating.');
+        err.statusCode = 429;
+        throw err;
+      }
     }
 
-    // 3. Call AI Service to generate report
+    // 3. Check persisted report if not forcing refresh
+    if (!forceRefresh) {
+      const cached = await RepositoryReport.findByRepositoryId(repoIdNum);
+      if (cached) {
+        return res.json(cached.content);
+      }
+    }
+
+    // 4. Call AI Service to generate report
     const abortController = new AbortController();
     const timeout = setTimeout(() => abortController.abort(), 60000); // 60s timeout
 
@@ -362,7 +380,7 @@ const getRepositoryReport = async (req, res, next) => {
 
       if (aiResponse.ok) {
         const report = await aiResponse.json();
-        reportCache.set(repoIdNum, { report, timestamp: Date.now() });
+        await RepositoryReport.create(repoIdNum, report);
         return res.json(report);
       }
       console.warn(`[report] AI service returned ${aiResponse.status}, generating fallback report`);
@@ -372,10 +390,10 @@ const getRepositoryReport = async (req, res, next) => {
       clearTimeout(timeout);
     }
 
-    // 4. Fallback: Generate report directly from stored repository files
+    // 5. Fallback: Generate report directly from stored repository files
     const files = await File.findByRepositoryId(repoIdNum);
     const fallbackReport = generateFallbackReport(repository, files);
-    reportCache.set(repoIdNum, { report: fallbackReport, timestamp: Date.now() });
+    await RepositoryReport.create(repoIdNum, fallbackReport);
     res.json(fallbackReport);
   } catch (error) {
     next(error);
@@ -538,6 +556,27 @@ const generateFallbackReport = (repository, files) => {
       executive_summary: `${repository.name} is a codebase structured across ${totalFiles} source files, built primarily with ${topLangs || 'modern technologies'}.`,
       architecture_style: 'Modular Multi-Tier Application',
       architecture_deep_dive: `### Architecture Overview\n\nThe repository \`${repository.name}\` is organized across ${totalFiles} source files and ${keyDirectories.length} primary directories. Key languages include ${topLangs}.\n\n### Subsystems & Components\n- **Entry Points**: ${entryPoints.map((e) => `\`${e.file_path}\``).join(', ') || 'Standard structure'}\n- **Dependencies**: ${dependencies.length} packages identified spanning runtime frameworks and development tooling.`,
+      tech_stack_summary: `Primary languages: ${topLangs || 'Mixed'}. Key frameworks and libraries: ${dependencies.slice(0, 15).map((d) => d.name).join(', ') || 'Standard library'}.`,
+      top_level_architecture: `Modular multi-tier application with ${keyDirectories.length} core directories. Communication flows through ${entryPoints.map((e) => e.file_path).join(', ') || 'standard entry points'} with ${detectedApis.length > 0 ? 'REST API endpoints' : 'internal modules'}.`,
+      repository_layout: `Structured into ${keyDirectories.length} top-level directories: ${keyDirectories.map((d) => d.path).join(', ')}. Entry points: ${entryPoints.map((e) => e.file_path).join(', ') || 'standard app files'}.`,
+      quick_start: `1. Install dependencies (${manifests.includes('package.json') ? 'npm install' : manifests.includes('requirements.txt') ? 'pip install -r requirements.txt' : 'install project dependencies'}).\n2. Configure environment variables.\n3. Run the application (${entryPoints.map((e) => e.name).join(', ') || 'app entry point'}).`,
+      prerequisites: [
+        'Node.js 18+',
+        'Python 3.9+',
+        'MySQL 8.0+',
+        'Git',
+        ...(detectedApis.length > 0 ? ['REST client / Postman'] : []),
+      ],
+      setup_instructions: [
+        `Clone the repository`,
+        `Install dependencies`,
+        `Configure environment variables`,
+        `Run database migrations if applicable`,
+        `Start the application`,
+      ],
+      configuration_environment: manifests.length > 0 ? manifests : ['Standard environment configuration'],
+      backend_description: detectedApis.length > 0 ? `Backend exposes ${detectedApis.length} API endpoints across ${new Set(detectedApis.map((a) => a.file)).size} files.` : 'Backend logic is distributed across service and utility modules.',
+      frontend_apis_description: detectedApis.length > 0 ? detectedApis.map((a) => `${a.method} ${a.path}`).join(', ') : 'No explicit API routes detected.',
       key_features: [
         { title: 'Modular Structure', description: `Organized into ${keyDirectories.length} distinct directories with clean separation of concerns.` },
         { title: 'Multi-Tier Ecosystem', description: `Powered by ${topLangs || 'modern web technologies'}.` },

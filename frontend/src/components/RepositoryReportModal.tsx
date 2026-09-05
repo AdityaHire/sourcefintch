@@ -3,26 +3,14 @@ import type { Repository, RepositoryFile, RepositoryReport } from '../types';
 import MarkdownRenderer from './MarkdownRenderer';
 import {
   X,
-  Sparkles,
   Copy,
   Check,
   Download,
   RefreshCw,
-  FileCode,
-  Layers,
-  Cpu,
-  FolderTree,
-  ShieldCheck,
-  Zap,
-  ListChecks,
-  ArrowRight,
-  Search,
   ExternalLink,
-  Package,
-  Terminal,
-  Clock,
-  Code2,
+  Sparkles,
   AlertTriangle,
+  ArrowRight,
 } from 'lucide-react';
 
 interface RepositoryReportModalProps {
@@ -36,46 +24,6 @@ interface RepositoryReportModalProps {
   onAskAI?: (prompt: string, autoSend?: boolean) => void;
   onInspectFile?: (filePath: string) => void;
 }
-
-type TabType = 'architecture' | 'tech_stack' | 'dependencies' | 'modules';
-
-const LANGUAGE_COLORS: Record<string, string> = {
-  TypeScript: '#3178c6',
-  JavaScript: '#f7df1e',
-  Python: '#3572a5',
-  TSX: '#61dafb',
-  JSX: '#20c997',
-  HTML: '#e34c26',
-  CSS: '#563d7c',
-  SCSS: '#c6538c',
-  JSON: '#cbcb41',
-  Markdown: '#083fa1',
-  SQL: '#e38c00',
-  Shell: '#89e051',
-  Go: '#00add8',
-  Rust: '#dea584',
-  Java: '#b07219',
-  Other: '#71717a',
-};
-
-const EXTENSION_MAP: Record<string, string> = {
-  '.ts': 'TypeScript',
-  '.tsx': 'TSX',
-  '.js': 'JavaScript',
-  '.jsx': 'JSX',
-  '.py': 'Python',
-  '.json': 'JSON',
-  '.html': 'HTML',
-  '.css': 'CSS',
-  '.scss': 'SCSS',
-  '.sql': 'SQL',
-  '.sh': 'Shell',
-  '.bash': 'Shell',
-  '.go': 'Go',
-  '.rs': 'Rust',
-  '.java': 'Java',
-  '.md': 'Markdown',
-};
 
 function generateClientReport(activeRepo: Repository, files: RepositoryFile[]): RepositoryReport {
   const totalFiles = files.length;
@@ -110,7 +58,7 @@ function generateClientReport(activeRepo: Repository, files: RepositoryFile[]): 
     }
 
     const ext = path.includes('.') ? '.' + path.split('.').pop()!.toLowerCase() : '';
-    const lang = EXTENSION_MAP[ext] || f.language || 'Other';
+    const lang = ext === '.ts' ? 'TypeScript' : ext === '.tsx' ? 'TSX' : ext === '.js' ? 'JavaScript' : ext === '.jsx' ? 'JSX' : ext === '.py' ? 'Python' : ext === '.json' ? 'JSON' : ext === '.html' ? 'HTML' : ext === '.css' ? 'CSS' : ext === '.scss' ? 'SCSS' : ext === '.sql' ? 'SQL' : ext === '.sh' || ext === '.bash' ? 'Shell' : ext === '.go' ? 'Go' : ext === '.rs' ? 'Rust' : ext === '.java' ? 'Java' : ext === '.md' ? 'Markdown' : f.language || 'Other';
     langCounts[lang] = (langCounts[lang] || 0) + 1;
     langLines[lang] = (langLines[lang] || 0) + lines;
 
@@ -173,6 +121,28 @@ function generateClientReport(activeRepo: Repository, files: RepositoryFile[]): 
     }
   }
 
+  const colors: Record<string, string> = {
+    TypeScript: '#3178c6',
+    JavaScript: '#f7df1e',
+    Python: '#3572a5',
+    TSX: '#61dafb',
+    JSX: '#20c997',
+    HTML: '#e34c26',
+    CSS: '#563d7c',
+    SCSS: '#c6538c',
+    JSON: '#cbcb41',
+    Markdown: '#083fa1',
+    SQL: '#e38c00',
+    Shell: '#89e051',
+    Go: '#00add8',
+    Rust: '#dea584',
+    Java: '#b07219',
+    'C++': '#f34b7d',
+    C: '#555555',
+    YAML: '#cb171e',
+    Other: '#71717a',
+  };
+
   const languages = Object.entries(langCounts)
     .sort((a, b) => b[1] - a[1])
     .map(([lang, count]) => ({
@@ -181,7 +151,7 @@ function generateClientReport(activeRepo: Repository, files: RepositoryFile[]): 
       line_count: langLines[lang] || 0,
       byte_size: 0,
       percentage: Number(((count / Math.max(totalFiles, 1)) * 100).toFixed(1)),
-      color: LANGUAGE_COLORS[lang] || LANGUAGE_COLORS.Other,
+      color: colors[lang] || colors.Other,
     }));
 
   const keyDirectories = Object.entries(dirCounts)
@@ -250,12 +220,8 @@ export default function RepositoryReportModal({
   onAskAI,
   onInspectFile,
 }: RepositoryReportModalProps) {
-  const [activeTab, setActiveTab] = useState<TabType>('architecture');
   const [copied, setCopied] = useState(false);
-  const [depSearch, setDepSearch] = useState('');
-  const [depFilter, setDepFilter] = useState<'all' | 'runtime' | 'dev'>('all');
 
-  // Effective report: server report if available, else client-side synthesis from loaded repoFiles
   const report = useMemo<RepositoryReport | null>(() => {
     if (serverReport) return serverReport;
     if (activeRepo && repoFiles && repoFiles.length > 0) {
@@ -266,59 +232,184 @@ export default function RepositoryReportModal({
 
   const isClientSynthesized = Boolean(!serverReport && report);
 
-  // Format full markdown for copy / export
   const fullMarkdown = useMemo(() => {
     if (!report) return '';
-    const langs = report.metrics.languages.map((l) => `- **${l.language}**: ${l.percentage}% (${l.file_count} files, ${l.line_count.toLocaleString()} lines)`).join('\n');
-    const keyDirs = report.key_directories.map((d) => `- **\`${d.path}/\`**: ${d.description} (${d.file_count} files)`).join('\n');
-    const entries = report.entry_points.map((e) => `- **\`${e.file_path}\`** (${e.language}): ${e.description}`).join('\n');
-    const features = report.ai_analysis.key_features.map((f) => `- **${f.title}**: ${f.description}`).join('\n');
-    const secPerf = report.ai_analysis.security_and_performance.map((s) => `- **${s.aspect}**: ${s.observation}${s.recommendation ? ` *(Recommendation: ${s.recommendation})*` : ''}`).join('\n');
-    const onboarding = report.ai_analysis.onboarding_guide.map((o) => `${o.step}. **${o.title}**: ${o.detail}`).join('\n');
+    const primaryLang = report.metrics.languages[0];
+    const primaryColor = (primaryLang?.color || '#71717a').replace('#', '');
+    const langName = primaryLang?.language || 'Code';
+    const langSlug = langName.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-    return `# Repository Intelligence Report: ${report.repo_name}
-> Branch: \`${report.branch}\` | Generated: ${new Date(report.generated_at).toLocaleString()} | Total Files: ${report.metrics.total_files} | Total Lines: ${report.metrics.total_lines.toLocaleString()}
+    const badges = [
+      `![${encodeURIComponent(langName)}](https://img.shields.io/badge/${encodeURIComponent(langName)}-${primaryColor}?logo=${langSlug}&logoColor=white)`,
+      `![Files](https://img.shields.io/badge/${report.metrics.total_files}%20files-blue)`,
+      report.branch ? `![Branch](https://img.shields.io/badge/branch-${encodeURIComponent(report.branch)}-lightgrey)` : '',
+    ].filter(Boolean).join(' ');
+
+    const rawTagline = report.ai_analysis.executive_summary.replace(/\s+/g, ' ').trim();
+    const tagline = rawTagline.length > 140 ? rawTagline.slice(0, 137).trimEnd() + '...' : rawTagline;
+    const shortSummary = report.ai_analysis.executive_summary;
+
+    const frameworks = report.dependencies.filter(d => d.category === 'Framework & Runtime').map(d => d.name).join(', ') || 'None detected';
+    const dbs = report.dependencies.filter(d => d.category === 'Database & Store').map(d => d.name).join(', ') || 'None detected';
+    const auths = report.dependencies.filter(d => d.category === 'Auth & Security').map(d => d.name).join(', ') || 'None detected';
+    const testing = report.dependencies.filter(d => d.category === 'Testing & QA').map(d => d.name).join(', ') || 'None detected';
+    const ai_ml = report.dependencies.filter(d => d.category === 'AI & Machine Learning').map(d => d.name).join(', ') || 'None detected';
+    const ui = report.dependencies.filter(d => d.category === 'UI & Styling').map(d => d.name).join(', ') || 'None detected';
+
+    const maxDirLen = Math.max(...report.key_directories.map(d => d.path.length), 8);
+    const treeLines = report.key_directories.slice(0, 15).map(d => {
+      const pad = ' '.repeat(Math.max(0, maxDirLen - d.path.length));
+      return `  ${d.path}/${pad} ${'.'.repeat(Math.max(3, 36 - d.path.length - pad.length))} ${d.file_count} files`;
+    });
+    const fileTree = `${report.repo_name}/\n${treeLines.join('\n')}`;
+
+    const entriesList = report.entry_points.map((e, i) => `${i + 1}. **\`${e.file_path}\`** (${e.language}): ${e.description}`).join('\n');
+
+    const apisByMethod = report.detected_apis.reduce((acc, api) => {
+      if (!acc[api.method]) acc[api.method] = [];
+      if (!acc[api.method].includes(api.path)) acc[api.method].push(api.path);
+      return acc;
+    }, {} as Record<string, string[]>);
+    const apiSections = Object.entries(apisByMethod).map(([method, paths]) => {
+      return `### ${method}\n${paths.map(p => `- \`${p}\``).join('\n')}`;
+    }).join('\n\n');
+
+    const runtimeDeps = report.dependencies.filter(d => d.type === 'runtime');
+    const devDeps = report.dependencies.filter(d => d.type === 'dev');
+
+    const renderDepGroup = (deps: typeof report.dependencies) => {
+      const grouped = deps.reduce((acc, d) => {
+        const cat = d.category || 'Utility & Tooling';
+        if (!acc[cat]) acc[cat] = [];
+        acc[cat].push(d);
+        return acc;
+      }, {} as Record<string, typeof report.dependencies>);
+      return Object.entries(grouped).map(([cat, items]) => {
+        const list = items.map(d => `- **${d.name}** — \`${d.version}\``).join('\n');
+        return `#### ${cat}\n${list}`;
+      }).join('\n\n');
+    };
+
+    const runtimeSection = runtimeDeps.length > 0 ? renderDepGroup(runtimeDeps) : '_No runtime dependencies detected._';
+    const devSection = devDeps.length > 0 ? renderDepGroup(devDeps) : '_No development dependencies detected._';
+
+    const prerequisitesList = (report.ai_analysis.prerequisites || []).map(p => `- ${p}`).join('\n');
+    const setupSteps = (report.ai_analysis.setup_instructions || []).map((s, i) => `${i + 1}. ${s}`).join('\n');
+    const configList = (report.ai_analysis.configuration_environment || []).map(c => `- ${c}`).join('\n');
+    const quickStart = report.ai_analysis.quick_start || '';
+
+    const secPerfList = report.ai_analysis.security_and_performance.map(s => `- **${s.aspect}**: ${s.observation}${s.recommendation ? ` — *Recommendation: ${s.recommendation}*` : ''}`).join('\n');
+
+    const exploreQuestions = (report.ai_analysis.recommended_questions || []).map(q => `- ${q}`).join('\n');
+
+    const featuresList = report.ai_analysis.key_features.map(f => `- **${f.title}**: ${f.description}`).join('\n');
+
+    const langTable = `| Language | Files | Lines | Size | Share |\n|----------|------:|------:|-----:|------:|\n${report.metrics.languages.map(l => `| ${l.language} | ${l.file_count} | ${l.line_count.toLocaleString()} | ${(l.byte_size / 1024).toFixed(1)} KB | ${l.percentage}% |`).join('\n')}`;
+
+    return `# ${report.repo_name}
+
+${badges}
+
+> ${tagline}
 
 ---
 
-## 1. Executive Summary
-${report.ai_analysis.executive_summary}
+## Overview
 
-**Architecture Style**: ${report.ai_analysis.architecture_style}
+${shortSummary}
+
+${featuresList ? `### Key Features\n${featuresList}\n` : ''}
 
 ---
 
-## 2. Architectural Deep Dive
+## Tech Stack
+
+${report.ai_analysis.tech_stack_summary || 'No tech stack summary available'}
+
+| Category | Technologies |
+|----------|-------------|
+| Languages | ${report.metrics.languages.slice(0, 5).map(l => l.language).join(', ') || 'Mixed'} |
+| Frameworks & Runtime | ${frameworks} |
+| Databases & Storage | ${dbs} |
+| Auth & Security | ${auths} |
+| Testing & QA | ${testing} |
+| AI & Machine Learning | ${ai_ml} |
+| UI & Styling | ${ui} |
+
+### Language Breakdown
+
+${langTable}
+
+---
+
+## Architecture
+
+${report.ai_analysis.top_level_architecture ? `### High-Level Architecture\n\n${report.ai_analysis.top_level_architecture}\n` : ''}
+
+${report.ai_analysis.repository_layout ? `### Repository Layout\n\n${report.ai_analysis.repository_layout}\n` : ''}
+
 ${report.ai_analysis.architecture_deep_dive}
 
----
-
-## 3. Key Features & Capabilities
-${features || 'No features listed'}
+${report.ai_analysis.backend_description ? `### Backend\n\n${report.ai_analysis.backend_description}\n` : ''}
+${report.ai_analysis.frontend_apis_description ? `### Frontend APIs\n\n${report.ai_analysis.frontend_apis_description}\n` : ''}
 
 ---
 
-## 4. Language & Code Distribution
-${langs || 'No language breakdown available'}
+## Project Structure
 
----
-
-## 5. Modules & Entry Points
-### Key Directories
-${keyDirs || 'Standard directory layout'}
+\`\`\`
+${fileTree}
+\`\`\`
 
 ### Entry Points
-${entries || 'Standard structure'}
+
+${entriesList || '_No explicit entry points detected._'}
 
 ---
 
-## 6. Security, Performance & Quality
-${secPerf || 'No specific observations'}
+## API Endpoints
+
+${apiSections || '_No API endpoints detected._'}
 
 ---
 
-## 7. Developer Onboarding Guide
-${onboarding || 'Follow standard project setup instructions'}
+## Dependencies
+
+### Runtime Dependencies
+
+${runtimeSection}
+
+### Development Dependencies
+
+${devSection}
+
+---
+
+## Getting Started
+
+${prerequisitesList ? `### Prerequisites\n${prerequisitesList}\n` : ''}
+
+${setupSteps ? `### Installation\n\n${setupSteps}\n` : ''}
+
+${configList ? `### Configuration\n\n${configList}\n` : ''}
+
+${quickStart ? `### Quick Start\n\n${quickStart}\n` : ''}
+
+---
+
+## Security & Performance Notes
+
+${secPerfList || '_No specific observations._'}
+
+---
+
+## Explore This Codebase
+
+${exploreQuestions || '_No recommended questions._'}
+
+---
+
+*Generated by Sourcefinch on ${new Date(report.generated_at).toLocaleString()}*
 `;
   }, [report]);
 
@@ -346,98 +437,74 @@ ${onboarding || 'Follow standard project setup instructions'}
     URL.revokeObjectURL(url);
   };
 
-  // Filtered dependencies
-  const filteredDeps = useMemo(() => {
-    if (!report) return [];
-    return report.dependencies.filter((d) => {
-      const matchesSearch =
-        d.name.toLowerCase().includes(depSearch.toLowerCase()) ||
-        d.category.toLowerCase().includes(depSearch.toLowerCase());
-      const matchesType = depFilter === 'all' || d.type === depFilter;
-      return matchesSearch && matchesType;
-    });
-  }, [report, depSearch, depFilter]);
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-8 bg-black/75 backdrop-blur-md animate-fade-in font-sans-ui select-text">
-      {/* Modal Container */}
-      <div className="relative flex flex-col w-full max-w-5xl h-[88vh] rounded-2xl border border-zinc-800 bg-zinc-950 text-zinc-100 shadow-2xl overflow-hidden">
-        {/* Top Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800/80 bg-zinc-900/60 backdrop-blur-sm shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/20 via-purple-500/20 to-pink-500/20 border border-purple-500/30 text-purple-400 shadow-inner">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base sm:text-lg font-bold tracking-tight text-white">
-                  Repository Intelligence Report
-                </h2>
-                {report && (
-                  <span className="rounded-md bg-zinc-800 border border-zinc-700/60 px-2 py-0.5 text-[11px] font-code text-zinc-300">
-                    {report.repo_name}
-                  </span>
-                )}
-                {isClientSynthesized && (
-                  <span className="rounded-md bg-purple-950/60 border border-purple-500/40 px-2 py-0.5 text-[10.5px] font-medium text-purple-300">
-                    Client-Side Analysis
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-zinc-400">
-                Auto-generated architectural synthesis and code intelligence
-              </p>
-            </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-8 bg-black/60 backdrop-blur-sm animate-fade-in font-sans-ui select-text">
+      <div className="relative flex flex-col w-full max-w-4xl max-h-[90vh] rounded-xl border border-zinc-800 bg-zinc-950 text-zinc-100 shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-800 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <h2 className="text-sm font-semibold text-white truncate">
+              {report ? report.repo_name : 'Repository Report'}
+            </h2>
+            {report && (
+              <span className="hidden sm:inline-flex items-center gap-2 text-[11px] text-zinc-500 font-code shrink-0">
+                <span>{report.branch}</span>
+                <span>·</span>
+                <span>{report.metrics.total_files} files</span>
+                <span>·</span>
+                <span>{report.metrics.total_lines.toLocaleString()} lines</span>
+              </span>
+            )}
+            {isClientSynthesized && (
+              <span className="rounded-md bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 text-[10px] font-medium text-zinc-400 shrink-0">
+                Client-Side Analysis
+              </span>
+            )}
           </div>
-
-          {/* Header Action Buttons */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
               onClick={handleCopyMarkdown}
               disabled={isLoading || !report}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-700/80 bg-zinc-800/80 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 text-xs font-medium text-zinc-300 transition-colors cursor-pointer disabled:opacity-40"
               title="Copy full report as Markdown"
             >
               {copied ? (
                 <>
                   <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-emerald-300">Copied!</span>
+                  <span className="text-emerald-300">Copied</span>
                 </>
               ) : (
                 <>
                   <Copy className="w-3.5 h-3.5" />
-                  <span>Copy Report</span>
+                  <span className="hidden sm:inline">Copy</span>
                 </>
               )}
             </button>
-
             <button
               type="button"
               onClick={handleDownloadMarkdown}
               disabled={isLoading || !report}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-700/80 bg-zinc-800/80 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 text-xs font-medium text-zinc-300 transition-colors cursor-pointer disabled:opacity-40"
               title="Download report as .md"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Export .md</span>
+              <span className="hidden sm:inline">Export</span>
             </button>
-
             <button
               type="button"
               onClick={onRefresh}
               disabled={isLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-purple-500/40 bg-purple-500/10 hover:bg-purple-500/20 text-xs font-semibold text-purple-300 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 text-xs font-medium text-zinc-300 transition-colors cursor-pointer disabled:opacity-40"
               title="Re-run intelligence analysis"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-              <span>{isLoading ? 'Analyzing...' : 'Regenerate'}</span>
+              <span className="hidden sm:inline">{isLoading ? 'Analyzing...' : 'Regenerate'}</span>
             </button>
-
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer ml-1"
+              className="p-1.5 rounded-md border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer"
               title="Close report"
             >
               <X className="w-4 h-4" />
@@ -445,47 +512,47 @@ ${onboarding || 'Follow standard project setup instructions'}
           </div>
         </div>
 
-        {/* Loading Overlay */}
+        {/* Loading */}
         {isLoading && (
-          <div className="flex flex-col items-center justify-center flex-1 p-8 text-center bg-zinc-950/80">
-            <div className="relative flex items-center justify-center w-16 h-16 mb-4">
-              <div className="absolute inset-0 rounded-full border-2 border-purple-500/20 border-t-purple-500 animate-spin" />
-              <Sparkles className="w-6 h-6 text-purple-400 animate-pulse" />
+          <div className="flex flex-col items-center justify-center flex-1 p-8 text-center">
+            <div className="relative flex items-center justify-center w-12 h-12 mb-4">
+              <div className="absolute inset-0 rounded-full border border-zinc-700 border-t-zinc-400 animate-spin" />
+              <Sparkles className="w-5 h-5 text-zinc-400 animate-pulse" />
             </div>
-            <h3 className="text-base font-semibold text-white mb-1">
+            <h3 className="text-sm font-semibold text-white mb-1">
               Analyzing Codebase & Synthesizing Report
             </h3>
-            <p className="text-xs text-zinc-400 max-w-sm">
+            <p className="text-xs text-zinc-500 max-w-sm">
               Scanning language distributions, parsing dependencies, and synthesizing architectural intelligence...
             </p>
           </div>
         )}
 
-        {/* Error / Empty State */}
+        {/* Error / Empty */}
         {!isLoading && !report && (
-          <div className="flex flex-col items-center justify-center flex-1 p-8 text-center bg-zinc-950">
-            <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 mb-4">
-              <AlertTriangle className="w-7 h-7" />
+          <div className="flex flex-col items-center justify-center flex-1 p-8 text-center">
+            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 mb-4">
+              <AlertTriangle className="w-6 h-6" />
             </div>
-            <h3 className="text-base font-bold text-white mb-2">
+            <h3 className="text-sm font-bold text-white mb-2">
               Unable to Load Repository Intelligence Report
             </h3>
-            <p className="text-xs text-zinc-400 max-w-md mb-6 leading-relaxed">
+            <p className="text-xs text-zinc-500 max-w-md mb-6 leading-relaxed">
               {errorMessage || 'The report could not be generated. Please make sure your repository is selected and indexed, then click Retry.'}
             </p>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={onRefresh}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-md shadow-purple-600/20 cursor-pointer transition-all"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700 cursor-pointer transition-colors"
               >
-                <RefreshCw className="w-4 h-4" />
+                <RefreshCw className="w-3.5 h-3.5" />
                 <span>Retry Analysis</span>
               </button>
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold cursor-pointer transition-all"
+                className="px-3 py-1.5 rounded-md border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-semibold cursor-pointer transition-colors"
               >
                 Close
               </button>
@@ -493,576 +560,381 @@ ${onboarding || 'Follow standard project setup instructions'}
           </div>
         )}
 
-        {/* Loaded Content */}
+        {/* Report Content */}
         {!isLoading && report && (
-          <>
-            {/* Sub-header Tabs & Quick Stats Bar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between px-6 py-2.5 border-b border-zinc-800/80 bg-zinc-900/40 gap-3 shrink-0">
-              {/* Tabs */}
-              <div className="flex items-center gap-1.5 overflow-x-auto">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('architecture')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                    activeTab === 'architecture'
-                      ? 'bg-purple-600/20 text-purple-300 border border-purple-500/40 shadow-xs'
-                      : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
-                  }`}
-                >
-                  <Cpu className="w-3.5 h-3.5" />
-                  <span>Architecture & Deep Dive</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('tech_stack')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                    activeTab === 'tech_stack'
-                      ? 'bg-purple-600/20 text-purple-300 border border-purple-500/40 shadow-xs'
-                      : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
-                  }`}
-                >
-                  <Layers className="w-3.5 h-3.5" />
-                  <span>Tech Stack & Languages</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('dependencies')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                    activeTab === 'dependencies'
-                      ? 'bg-purple-600/20 text-purple-300 border border-purple-500/40 shadow-xs'
-                      : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
-                  }`}
-                >
-                  <Package className="w-3.5 h-3.5" />
-                  <span>Dependencies ({report.dependencies.length})</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('modules')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                    activeTab === 'modules'
-                      ? 'bg-purple-600/20 text-purple-300 border border-purple-500/40 shadow-xs'
-                      : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
-                  }`}
-                >
-                  <FolderTree className="w-3.5 h-3.5" />
-                  <span>Modules & APIs ({report.entry_points.length + report.detected_apis.length})</span>
-                </button>
-              </div>
-
-              {/* Quick Metrics */}
-              <div className="flex items-center gap-3 text-xs text-zinc-400 shrink-0 font-code">
-                <span>{report.metrics.total_files} files</span>
-                <span>·</span>
-                <span>{report.metrics.total_lines.toLocaleString()} lines</span>
-                <span>·</span>
-                <span className="flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-zinc-500" />
-                  {new Date(report.generated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              </div>
-            </div>
-
-            {/* Scrollable Content Body */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 text-zinc-200">
-              {/* TAB 1: ARCHITECTURE & DEEP DIVE */}
-              {activeTab === 'architecture' && (
-                <div className="space-y-6 animate-fade-in">
-                  {/* Executive Summary Card */}
-                  <div className="rounded-xl border border-purple-500/30 bg-gradient-to-r from-purple-950/30 via-zinc-900/40 to-indigo-950/30 p-5 shadow-sm">
-                    <div className="flex items-center gap-2 mb-2.5">
-                      <span className="px-2 py-0.5 rounded-md bg-purple-500/20 border border-purple-500/30 text-purple-300 text-[11px] font-semibold tracking-wide uppercase">
-                        Executive Summary
-                      </span>
-                      <span className="px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-300 text-[11px] font-code">
-                        {report.ai_analysis.architecture_style}
-                      </span>
-                    </div>
-                    <p className="text-sm sm:text-base text-zinc-200 leading-relaxed font-sans">
-                      {report.ai_analysis.executive_summary}
-                    </p>
-                  </div>
-
-                  {/* Deep Dive Markdown Text */}
-                  <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6 shadow-xs">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400 mb-4 flex items-center gap-2">
-                      <Code2 className="w-4 h-4 text-purple-400" />
-                      Architectural Deep Dive & Patterns
-                    </h3>
-                    <div className="prose prose-invert max-w-none text-zinc-300 text-sm">
-                      <MarkdownRenderer
-                        content={report.ai_analysis.architecture_deep_dive}
-                        onOpenCode={(path) => {
-                          if (onInspectFile) {
-                            onInspectFile(path);
-                            onClose();
-                          }
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Key Features Grid */}
-                  {report.ai_analysis.key_features.length > 0 && (
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-amber-400" />
-                        Core Functional Capabilities
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {report.ai_analysis.key_features.map((feat, idx) => (
-                          <div
-                            key={idx}
-                            className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-4 hover:border-zinc-700 transition-colors"
-                          >
-                            <h4 className="text-xs font-semibold text-white mb-1 flex items-center gap-1.5">
-                              <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
-                              {feat.title}
-                            </h4>
-                            <p className="text-xs text-zinc-400 leading-relaxed">
-                              {feat.description}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Security & Performance Insights */}
-                  {report.ai_analysis.security_and_performance.length > 0 && (
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
-                        <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                        Security, Performance & Best Practices
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {report.ai_analysis.security_and_performance.map((sec, idx) => (
-                          <div
-                            key={idx}
-                            className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-4"
-                          >
-                            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 mb-2">
-                              {sec.aspect}
-                            </span>
-                            <p className="text-xs text-zinc-300 mb-1.5">
-                              {sec.observation}
-                            </p>
-                            {sec.recommendation && (
-                              <p className="text-[11px] text-zinc-500 italic">
-                                Tip: {sec.recommendation}
-                              </p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Developer Onboarding Guide */}
-                  {report.ai_analysis.onboarding_guide.length > 0 && (
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
-                        <ListChecks className="w-4 h-4 text-indigo-400" />
-                        Developer Quickstart & Onboarding Roadmap
-                      </h3>
-                      <div className="space-y-2">
-                        {report.ai_analysis.onboarding_guide.map((step, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-start gap-3 rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-3.5"
-                          >
-                            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-purple-500/20 text-purple-300 text-xs font-bold shrink-0 border border-purple-500/30">
-                              {step.step || idx + 1}
-                            </span>
-                            <div>
-                              <h4 className="text-xs font-semibold text-white mb-0.5">
-                                {step.title}
-                              </h4>
-                              <p className="text-xs text-zinc-400 leading-relaxed">
-                                {step.detail}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* AI Suggested Exploration Chips */}
-                  {report.ai_analysis.recommended_questions.length > 0 && (
-                    <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-4 space-y-2.5">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
-                        <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-                        Explore Further with AI
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
-                        {report.ai_analysis.recommended_questions.map((q, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => {
-                              if (onAskAI) {
-                                onAskAI(q, true);
-                                onClose();
-                              }
-                            }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-xs text-purple-200 transition-all cursor-pointer shadow-xs"
-                          >
-                            <span>{q}</span>
-                            <ArrowRight className="w-3 h-3 text-purple-400" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+          <div className="flex-1 overflow-y-auto">
+            <div className="px-6 py-6 space-y-8 text-zinc-300 text-[13px] leading-relaxed">
+              {/* Title & Meta */}
+              <section>
+                <h1 className="text-lg font-bold text-white mb-1">
+                  {report.repo_name}
+                </h1>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-zinc-500 font-code">
+                  <span>Owner: {report.owner || '—'}</span>
+                  <span>·</span>
+                  <span>Branch: {report.branch}</span>
+                  <span>·</span>
+                  <span>Generated: {new Date(report.generated_at).toLocaleString()}</span>
                 </div>
+              </section>
+
+              {/* Executive Summary */}
+              <section className="space-y-2">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Executive Summary</h2>
+                <p className="text-zinc-200">{report.ai_analysis.executive_summary}</p>
+                <p className="text-zinc-400">
+                  <span className="text-zinc-500">Architecture:</span> {report.ai_analysis.architecture_style}
+                </p>
+              </section>
+
+              {/* Tech Stack */}
+              {report.ai_analysis.tech_stack_summary && (
+                <section className="space-y-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Tech Stack</h2>
+                  <p className="text-zinc-300 text-xs leading-relaxed">{report.ai_analysis.tech_stack_summary}</p>
+                </section>
               )}
 
-              {/* TAB 2: TECH STACK & LANGUAGES */}
-              {activeTab === 'tech_stack' && (
-                <div className="space-y-6 animate-fade-in">
-                  {/* Visual Language Bar */}
-                  <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 space-y-4">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">
-                      Language Distribution
-                    </h3>
-                    {/* Multi-color Bar */}
-                    <div className="h-3 w-full rounded-full bg-zinc-800 overflow-hidden flex shadow-inner">
-                      {report.metrics.languages.map((l, idx) => (
-                        <div
-                          key={idx}
-                          style={{
-                            width: `${Math.max(l.percentage, 1)}%`,
-                            backgroundColor: l.color,
-                          }}
-                          className="h-full transition-all hover:brightness-125"
-                          title={`${l.language}: ${l.percentage}% (${l.file_count} files)`}
-                        />
-                      ))}
-                    </div>
+              {/* Top-Level Architecture */}
+              {report.ai_analysis.top_level_architecture && (
+                <section className="space-y-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Top-Level Architecture</h2>
+                  <p className="text-zinc-300 text-xs leading-relaxed">{report.ai_analysis.top_level_architecture}</p>
+                </section>
+              )}
 
-                    {/* Language Pills */}
-                    <div className="flex flex-wrap gap-3 pt-1">
-                      {report.metrics.languages.map((l, idx) => (
-                        <div key={idx} className="flex items-center gap-2 text-xs">
-                          <span
-                            className="w-2.5 h-2.5 rounded-full"
-                            style={{ backgroundColor: l.color }}
-                          />
-                          <span className="font-semibold text-zinc-200">{l.language}</span>
-                          <span className="text-zinc-500 font-code">{l.percentage}%</span>
-                          <span className="text-zinc-600 text-[11px]">({l.file_count} files)</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+              {/* Repository Layout */}
+              {report.ai_analysis.repository_layout && (
+                <section className="space-y-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Repository Layout</h2>
+                  <p className="text-zinc-300 text-xs leading-relaxed">{report.ai_analysis.repository_layout}</p>
+                </section>
+              )}
 
-                  {/* Languages Detailed Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {report.metrics.languages.map((l, idx) => (
-                      <div
-                        key={idx}
-                        className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-4 flex flex-col justify-between"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: l.color }}
-                            />
-                            <h4 className="text-sm font-bold text-white">{l.language}</h4>
-                          </div>
-                          <span className="font-code text-xs font-bold text-purple-400">
-                            {l.percentage}%
-                          </span>
-                        </div>
-                        <div className="space-y-1 text-xs text-zinc-400 font-code">
-                          <div className="flex justify-between">
-                            <span>Files:</span>
-                            <span className="text-zinc-200">{l.file_count}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Lines of Code:</span>
-                            <span className="text-zinc-200">{l.line_count.toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Size:</span>
-                            <span className="text-zinc-200">
-                              {(l.byte_size / 1024).toFixed(1)} KB
-                            </span>
-                          </div>
-                        </div>
-                      </div>
+              {/* Quick Start */}
+              {report.ai_analysis.quick_start && (
+                <section className="space-y-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Quick Start</h2>
+                  <p className="text-zinc-300 text-xs leading-relaxed whitespace-pre-line">{report.ai_analysis.quick_start}</p>
+                </section>
+              )}
+
+              {/* Prerequisites */}
+              {report.ai_analysis.prerequisites && report.ai_analysis.prerequisites.length > 0 && (
+                <section className="space-y-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Prerequisites</h2>
+                  <ul className="list-disc list-inside text-xs text-zinc-300 space-y-1">
+                    {report.ai_analysis.prerequisites.map((item, idx) => (
+                      <li key={idx}>{item}</li>
                     ))}
-                  </div>
-
-                  {/* Detected Manifests */}
-                  {report.manifests.length > 0 && (
-                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 space-y-3">
-                      <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
-                        <Terminal className="w-4 h-4 text-cyan-400" />
-                        Project Manifests & Configuration
-                      </h3>
-                      <div className="flex flex-wrap gap-2">
-                        {report.manifests.map((m, idx) => (
-                          <div
-                            key={idx}
-                            onClick={() => {
-                              if (onInspectFile) {
-                                onInspectFile(m);
-                                onClose();
-                              }
-                            }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 text-xs font-code text-zinc-200 cursor-pointer transition-colors"
-                          >
-                            <FileCode className="w-3.5 h-3.5 text-zinc-400" />
-                            <span>{m}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                  </ul>
+                </section>
               )}
 
-              {/* TAB 3: DEPENDENCIES */}
-              {activeTab === 'dependencies' && (
-                <div className="space-y-4 animate-fade-in">
-                  {/* Search and Filters */}
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 rounded-xl border border-zinc-800 bg-zinc-900/50">
-                    <div className="relative w-full sm:w-72">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" />
-                      <input
-                        type="text"
-                        placeholder="Search dependencies..."
-                        value={depSearch}
-                        onChange={(e) => setDepSearch(e.target.value)}
-                        className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-zinc-800/80 border border-zinc-700/60 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-purple-500 transition-colors"
-                      />
-                    </div>
+              {/* Setup Instructions */}
+              {report.ai_analysis.setup_instructions && report.ai_analysis.setup_instructions.length > 0 && (
+                <section className="space-y-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Setup</h2>
+                  <ol className="list-decimal list-inside text-xs text-zinc-300 space-y-1">
+                    {report.ai_analysis.setup_instructions.map((item, idx) => (
+                      <li key={idx}>{item}</li>
+                    ))}
+                  </ol>
+                </section>
+              )}
 
-                    <div className="flex items-center gap-1 self-end sm:self-auto">
-                      {(['all', 'runtime', 'dev'] as const).map((type) => (
-                        <button
-                          key={type}
-                          type="button"
-                          onClick={() => setDepFilter(type)}
-                          className={`px-2.5 py-1 rounded-md text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer ${
-                            depFilter === type
-                              ? 'bg-purple-600/30 text-purple-300 border border-purple-500/50'
-                              : 'text-zinc-400 hover:text-zinc-200'
-                          }`}
-                        >
-                          {type}
-                        </button>
+              {/* Configuration & Environment */}
+              {report.ai_analysis.configuration_environment && report.ai_analysis.configuration_environment.length > 0 && (
+                <section className="space-y-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Configuration & Environment</h2>
+                  <ul className="list-disc list-inside text-xs text-zinc-300 space-y-1">
+                    {report.ai_analysis.configuration_environment.map((item, idx) => (
+                      <li key={idx}>{item}</li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              {/* Backend */}
+              {report.ai_analysis.backend_description && (
+                <section className="space-y-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Backend</h2>
+                  <p className="text-zinc-300 text-xs leading-relaxed">{report.ai_analysis.backend_description}</p>
+                </section>
+              )}
+
+              {/* Frontend APIs */}
+              {report.ai_analysis.frontend_apis_description && (
+                <section className="space-y-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Frontend APIs</h2>
+                  <p className="text-zinc-300 text-xs leading-relaxed">{report.ai_analysis.frontend_apis_description}</p>
+                </section>
+              )}
+
+              {/* Metrics Overview Table */}
+              <section className="space-y-2">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Repository Metrics</h2>
+                <table className="w-full text-left border border-zinc-800 rounded-md overflow-hidden text-xs">
+                  <tbody className="divide-y divide-zinc-800">
+                    <tr>
+                      <td className="px-3 py-2 text-zinc-500 w-40">Total Files</td>
+                      <td className="px-3 py-2 text-zinc-200 font-medium">{report.metrics.total_files.toLocaleString()}</td>
+                    </tr>
+                    <tr>
+                      <td className="px-3 py-2 text-zinc-500">Total Lines</td>
+                      <td className="px-3 py-2 text-zinc-200 font-medium">{report.metrics.total_lines.toLocaleString()}</td>
+                    </tr>
+                    <tr>
+                      <td className="px-3 py-2 text-zinc-500">Total Size</td>
+                      <td className="px-3 py-2 text-zinc-200 font-medium">{(report.metrics.total_size_bytes / 1024).toFixed(1)} KB</td>
+                    </tr>
+                    <tr>
+                      <td className="px-3 py-2 text-zinc-500">Languages</td>
+                      <td className="px-3 py-2 text-zinc-200 font-medium">{report.metrics.languages.length}</td>
+                    </tr>
+                    <tr>
+                      <td className="px-3 py-2 text-zinc-500">Dependencies</td>
+                      <td className="px-3 py-2 text-zinc-200 font-medium">{report.dependencies.length}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </section>
+
+              {/* Languages Table */}
+              {report.metrics.languages.length > 0 && (
+                <section className="space-y-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Languages</h2>
+                  <table className="w-full text-left border border-zinc-800 rounded-md overflow-hidden text-xs">
+                    <thead>
+                      <tr className="border-b border-zinc-800 bg-zinc-900/60 text-zinc-400">
+                        <th className="px-3 py-2 font-medium">Language</th>
+                        <th className="px-3 py-2 font-medium text-right">Files</th>
+                        <th className="px-3 py-2 font-medium text-right">Lines</th>
+                        <th className="px-3 py-2 font-medium text-right">Share</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800">
+                      {report.metrics.languages.map((l, idx) => (
+                        <tr key={idx} className="hover:bg-zinc-900/40">
+                          <td className="px-3 py-2 text-zinc-200 font-medium">{l.language}</td>
+                          <td className="px-3 py-2 text-zinc-400 text-right font-code">{l.file_count}</td>
+                          <td className="px-3 py-2 text-zinc-400 text-right font-code">{l.line_count.toLocaleString()}</td>
+                          <td className="px-3 py-2 text-zinc-400 text-right font-code w-24">{l.percentage}%</td>
+                        </tr>
                       ))}
-                    </div>
-                  </div>
+                    </tbody>
+                  </table>
+                </section>
+              )}
 
-                  {/* Dependency List Table */}
-                  <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 overflow-hidden">
-                    <table className="w-full text-left text-xs border-collapse">
+              {/* Directories Table */}
+              {report.key_directories.length > 0 && (
+                <section className="space-y-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Key Directories</h2>
+                  <table className="w-full text-left border border-zinc-800 rounded-md overflow-hidden text-xs">
+                    <thead>
+                      <tr className="border-b border-zinc-800 bg-zinc-900/60 text-zinc-400">
+                        <th className="px-3 py-2 font-medium">Directory</th>
+                        <th className="px-3 py-2 font-medium text-right">Files</th>
+                        <th className="px-3 py-2 font-medium">Description</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800">
+                      {report.key_directories.map((d, idx) => (
+                        <tr key={idx} className="hover:bg-zinc-900/40">
+                          <td className="px-3 py-2 text-zinc-200 font-medium font-code">{d.path}/</td>
+                          <td className="px-3 py-2 text-zinc-400 text-right font-code">{d.file_count}</td>
+                          <td className="px-3 py-2 text-zinc-400">{d.description}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+              )}
+
+              {/* Dependencies Table */}
+              {report.dependencies.length > 0 && (
+                <section className="space-y-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Dependencies</h2>
+                  <div className="border border-zinc-800 rounded-md overflow-hidden">
+                    <table className="w-full text-left text-xs">
                       <thead>
-                        <tr className="border-b border-zinc-800 bg-zinc-900/80 text-zinc-400 font-semibold uppercase tracking-wider">
-                          <th className="px-4 py-3">Package Name</th>
-                          <th className="px-4 py-3">Version</th>
-                          <th className="px-4 py-3">Category</th>
-                          <th className="px-4 py-3">Type</th>
+                        <tr className="border-b border-zinc-800 bg-zinc-900/60 text-zinc-400">
+                          <th className="px-3 py-2 font-medium">Package</th>
+                          <th className="px-3 py-2 font-medium">Version</th>
+                          <th className="px-3 py-2 font-medium">Category</th>
+                          <th className="px-3 py-2 font-medium">Type</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-zinc-800/60">
-                        {filteredDeps.length === 0 ? (
-                          <tr>
-                            <td colSpan={4} className="px-4 py-8 text-center text-zinc-500">
-                              No dependencies found matching filters.
-                            </td>
+                      <tbody className="divide-y divide-zinc-800">
+                        {report.dependencies.map((dep, idx) => (
+                          <tr key={idx} className="hover:bg-zinc-900/40">
+                            <td className="px-3 py-2 text-zinc-200 font-medium font-code">{dep.name}</td>
+                            <td className="px-3 py-2 text-zinc-400 font-code">{dep.version}</td>
+                            <td className="px-3 py-2 text-zinc-400">{dep.category}</td>
+                            <td className="px-3 py-2 text-zinc-500">{dep.type}</td>
                           </tr>
-                        ) : (
-                          filteredDeps.map((dep, idx) => (
-                            <tr key={idx} className="hover:bg-zinc-800/40 transition-colors font-code">
-                              <td className="px-4 py-2.5 font-medium text-zinc-200">
-                                {dep.name}
-                              </td>
-                              <td className="px-4 py-2.5 text-purple-300">
-                                {dep.version}
-                              </td>
-                              <td className="px-4 py-2.5 font-sans">
-                                <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-zinc-800 border border-zinc-700 text-zinc-300">
-                                  {dep.category}
-                                </span>
-                              </td>
-                              <td className="px-4 py-2.5 font-sans">
-                                <span
-                                  className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold ${
-                                    dep.type === 'runtime'
-                                      ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                                      : 'bg-blue-500/15 text-blue-300 border border-blue-500/30'
-                                  }`}
-                                >
-                                  {dep.type}
-                                </span>
-                              </td>
-                            </tr>
-                          ))
-                        )}
+                        ))}
                       </tbody>
                     </table>
                   </div>
-
-                  {/* Project Scripts if available */}
-                  {Object.keys(report.scripts).length > 0 && (
-                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 space-y-3">
-                      <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
-                        <Terminal className="w-4 h-4 text-emerald-400" />
-                        Detected Run & Build Scripts
-                      </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {Object.entries(report.scripts).map(([name, cmd], idx) => (
-                          <div
-                            key={idx}
-                            className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5 font-code text-xs flex flex-col justify-between"
-                          >
-                            <span className="font-semibold text-zinc-300">{name}</span>
-                            <span className="text-zinc-500 truncate mt-1 text-[11px]">{cmd}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                </section>
               )}
 
-              {/* TAB 4: MODULES & ENTRY POINTS */}
-              {activeTab === 'modules' && (
-                <div className="space-y-6 animate-fade-in">
-                  {/* Entry Points Section */}
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
-                      <FileCode className="w-4 h-4 text-purple-400" />
-                      Primary Application Entry Points
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {report.entry_points.length === 0 ? (
-                        <p className="text-xs text-zinc-500">Standard structure entry points.</p>
-                      ) : (
-                        report.entry_points.map((entry, idx) => (
-                          <div
-                            key={idx}
-                            className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-4 flex flex-col justify-between hover:border-zinc-700 transition-colors"
+              {/* Entry Points */}
+              {report.entry_points.length > 0 && (
+                <section className="space-y-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Entry Points</h2>
+                  <ul className="space-y-1.5">
+                    {report.entry_points.map((entry, idx) => (
+                      <li key={idx} className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <span className="text-zinc-200 font-medium font-code text-xs">{entry.file_path}</span>
+                          <span className="text-zinc-500 text-xs ml-2">{entry.description}</span>
+                        </div>
+                        {onInspectFile && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onInspectFile(entry.file_path);
+                              onClose();
+                            }}
+                            className="shrink-0 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
+                            title="Inspect in CodeViewer"
                           >
-                            <div>
-                              <div className="flex items-center justify-between mb-1.5">
-                                <span className="text-xs font-bold text-white font-code truncate">
-                                  {entry.file_path}
-                                </span>
-                                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                                  {entry.language}
-                                </span>
-                              </div>
-                              <p className="text-xs text-zinc-400">{entry.description}</p>
-                            </div>
-                            <div className="pt-3">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (onInspectFile) {
-                                    onInspectFile(entry.file_path);
-                                    onClose();
-                                  }
-                                }}
-                                className="flex items-center gap-1 text-xs font-semibold text-purple-300 hover:text-purple-200 transition-colors cursor-pointer"
-                              >
-                                <span>Inspect in CodeViewer</span>
-                                <ExternalLink className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
+                            <ExternalLink className="w-3 h-3" />
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
 
-                  {/* Key Directories Section */}
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
-                      <FolderTree className="w-4 h-4 text-indigo-400" />
-                      Key Directory Layout
-                    </h3>
-                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 overflow-hidden">
-                      <table className="w-full text-left text-xs border-collapse font-code">
-                        <thead>
-                          <tr className="border-b border-zinc-800 bg-zinc-900/80 text-zinc-400 font-semibold uppercase tracking-wider font-sans">
-                            <th className="px-4 py-3">Directory</th>
-                            <th className="px-4 py-3">File Count</th>
-                            <th className="px-4 py-3">Role / Purpose</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-zinc-800/60">
-                          {report.key_directories.map((dir, idx) => (
-                            <tr key={idx} className="hover:bg-zinc-800/40 transition-colors">
-                              <td className="px-4 py-2.5 font-bold text-purple-300">
-                                {dir.path}/
-                              </td>
-                              <td className="px-4 py-2.5 text-zinc-400">
-                                {dir.file_count} files
-                              </td>
-                              <td className="px-4 py-2.5 text-zinc-300 font-sans">
-                                {dir.description}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+              {/* Detected APIs */}
+              {report.detected_apis.length > 0 && (
+                <section className="space-y-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Detected API Endpoints</h2>
+                  <table className="w-full text-left border border-zinc-800 rounded-md overflow-hidden text-xs">
+                    <thead>
+                      <tr className="border-b border-zinc-800 bg-zinc-900/60 text-zinc-400">
+                        <th className="px-3 py-2 font-medium w-16">Method</th>
+                        <th className="px-3 py-2 font-medium">Path</th>
+                        <th className="px-3 py-2 font-medium text-right">File</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800">
+                      {report.detected_apis.map((api, idx) => (
+                        <tr key={idx} className="hover:bg-zinc-900/40">
+                          <td className="px-3 py-2">
+                            <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                              api.method === 'GET' ? 'bg-emerald-500/15 text-emerald-400' :
+                              api.method === 'POST' ? 'bg-blue-500/15 text-blue-400' :
+                              api.method === 'DELETE' ? 'bg-red-500/15 text-red-400' :
+                              'bg-amber-500/15 text-amber-400'
+                            }`}>
+                              {api.method}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-zinc-200 font-code">{api.path}</td>
+                          <td className="px-3 py-2 text-zinc-500 text-right font-code truncate max-w-[200px]">{api.file}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+              )}
 
-                  {/* Detected API Endpoints */}
-                  {report.detected_apis.length > 0 && (
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
-                        <Terminal className="w-4 h-4 text-emerald-400" />
-                        Identified API Endpoints & Routes
-                      </h3>
-                      <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 overflow-hidden max-h-72 overflow-y-auto">
-                        <table className="w-full text-left text-xs border-collapse font-code">
-                          <tbody className="divide-y divide-zinc-800/60">
-                            {report.detected_apis.map((api, idx) => (
-                              <tr key={idx} className="hover:bg-zinc-800/40 transition-colors">
-                                <td className="px-4 py-2 w-20">
-                                  <span
-                                    className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                      api.method === 'GET'
-                                        ? 'bg-emerald-500/20 text-emerald-300'
-                                        : api.method === 'POST'
-                                        ? 'bg-blue-500/20 text-blue-300'
-                                        : api.method === 'DELETE'
-                                        ? 'bg-red-500/20 text-red-300'
-                                        : 'bg-amber-500/20 text-amber-300'
-                                    }`}
-                                  >
-                                    {api.method}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-2 text-zinc-200 font-medium">
-                                  {api.path}
-                                </td>
-                                <td className="px-4 py-2 text-zinc-500 text-right">
-                                  {api.file}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
+              {/* Architecture Deep Dive */}
+              <section className="space-y-2">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Architecture Deep Dive</h2>
+                <div className="text-zinc-300 prose prose-invert max-w-none text-xs leading-relaxed">
+                  <MarkdownRenderer
+                    content={report.ai_analysis.architecture_deep_dive}
+                    onOpenCode={(path) => {
+                      if (onInspectFile) {
+                        onInspectFile(path);
+                        onClose();
+                      }
+                    }}
+                  />
                 </div>
+              </section>
+
+              {/* Key Features */}
+              {report.ai_analysis.key_features.length > 0 && (
+                <section className="space-y-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Key Features</h2>
+                  <ul className="space-y-1.5 list-disc list-inside text-zinc-300">
+                    {report.ai_analysis.key_features.map((feat, idx) => (
+                      <li key={idx}>
+                        <span className="text-zinc-200 font-medium">{feat.title}</span>
+                        <span className="text-zinc-500"> — {feat.description}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              {/* Security & Performance */}
+              {report.ai_analysis.security_and_performance.length > 0 && (
+                <section className="space-y-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Security, Performance & Quality</h2>
+                  <ul className="space-y-1.5">
+                    {report.ai_analysis.security_and_performance.map((sec, idx) => (
+                      <li key={idx} className="text-zinc-300">
+                        <span className="text-zinc-200 font-medium">{sec.aspect}</span>
+                        <span className="text-zinc-500"> — {sec.observation}</span>
+                        {sec.recommendation && (
+                          <span className="text-zinc-600 italic"> (Tip: {sec.recommendation})</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              {/* Onboarding */}
+              {report.ai_analysis.onboarding_guide.length > 0 && (
+                <section className="space-y-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Developer Quickstart</h2>
+                  <ol className="space-y-1.5 list-decimal list-inside text-zinc-300">
+                    {report.ai_analysis.onboarding_guide.map((step, idx) => (
+                      <li key={idx}>
+                        <span className="text-zinc-200 font-medium">{step.title}</span>
+                        <span className="text-zinc-500"> — {step.detail}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+              )}
+
+              {/* Suggested Questions */}
+              {report.ai_analysis.recommended_questions.length > 0 && (
+                <section className="space-y-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Explore Further with AI</h2>
+                  <div className="flex flex-wrap gap-2">
+                    {report.ai_analysis.recommended_questions.map((q, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          if (onAskAI) {
+                            onAskAI(q, true);
+                            onClose();
+                          }
+                        }}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 text-xs text-zinc-300 transition-colors cursor-pointer"
+                      >
+                        <span>{q}</span>
+                        <ArrowRight className="w-3 h-3 text-zinc-500" />
+                      </button>
+                    ))}
+                  </div>
+                </section>
               )}
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>

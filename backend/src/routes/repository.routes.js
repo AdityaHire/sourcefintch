@@ -14,7 +14,7 @@ const { Router } = require('express');
 const requireAuth = require('../middleware/requireAuth');
 const requireInternalSecret = require('../middleware/requireInternalSecret');
 const requireAuthOrInternal = require('../middleware/requireAuthOrInternal');
-const { ingestionRateLimiter } = require('../middleware/rateLimiter');
+const { ingestionRateLimiter, reportRateLimiter } = require('../middleware/rateLimiter');
 const {
   listCompletedRepositories,
   createRepository,
@@ -48,8 +48,8 @@ router.get('/:id/files', requireAuthOrInternal, getRepositoryFiles);
 router.get('/:id/files/:fileId', requireAuthOrInternal, getFileContent);
 
 // GET & POST /api/repositories/:id/report — Full Repository Intelligence Report
-router.get('/:id/report', requireAuthOrInternal, getRepositoryReport);
-router.post('/:id/report', requireAuthOrInternal, getRepositoryReport);
+router.get('/:id/report', requireAuthOrInternal, reportRateLimiter, getRepositoryReport);
+router.post('/:id/report', requireAuthOrInternal, reportRateLimiter, getRepositoryReport);
 
 // PATCH /api/repositories/:id/status — AI service only
 router.patch('/:id/status', requireInternalSecret, updateRepositoryStatus);

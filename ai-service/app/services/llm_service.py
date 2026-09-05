@@ -294,6 +294,80 @@ class MockLLMProvider:
             await asyncio.sleep(0.01)
 
 
+class GeminiProvider:
+    """Gemini API provider using google-genai SDK."""
+
+    def __init__(
+        self,
+        api_key: str = "",
+        model: str = "gemini-2.5-flash",
+        timeout_seconds: float = 60.0,
+    ):
+        self.api_key = api_key or settings.gemini_api_key
+        self.model = model or settings.report_llm_model
+        self.timeout_seconds = timeout_seconds or settings.report_llm_timeout_seconds
+        self._client = None
+        self._types = None
+
+    def _get_client(self):
+        if self._client is None:
+            from google import genai
+            from google.genai import types
+
+            logger.info("Initializing Gemini LLM client (model=%s) ...", self.model)
+            self._client = genai.Client(api_key=self.api_key)
+            self._types = types
+        return self._client
+
+    async def generate_answer(self, system_prompt: str, user_prompt: str) -> LLMResult:
+        if not self.api_key:
+            logger.error("Gemini API key is not configured.")
+            raise HTTPException(
+                status_code=500,
+                detail="GEMINI_API_KEY is not configured. Please set GEMINI_API_KEY in .env",
+            )
+
+        def _sync_call():
+            client = self._get_client()
+            response = client.models.generate_content(
+                model=self.model,
+                contents=user_prompt,
+                config=self._types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    temperature=0.1,
+                    max_output_tokens=8192,
+                ),
+            )
+            return response
+
+        try:
+            loop = asyncio.get_running_loop()
+            response = await loop.run_in_executor(None, _sync_call)
+            usage = None
+            if hasattr(response, "usage_metadata") and response.usage_metadata:
+                usage = {
+                    "prompt_tokens": getattr(response.usage_metadata, "prompt_token_count", None),
+                    "completion_tokens": getattr(response.usage_metadata, "candidates_token_count", None),
+                    "total_tokens": getattr(response.usage_metadata, "total_token_count", None),
+                }
+            logger.info(
+                "Gemini API Response | Model: %s | Prompt Tokens: %s, Completion Tokens: %s",
+                self.model,
+                usage.get("prompt_tokens") if usage else None,
+                usage.get("completion_tokens") if usage else None,
+            )
+            return LLMResult(answer=response.text.strip(), usage=usage)
+        except Exception as exc:
+            logger.error("Gemini API call failed: %s", exc)
+            raise HTTPException(
+                status_code=502,
+                detail=f"Gemini API error: {exc}",
+            )
+
+    async def stream_answer(self, system_prompt: str, user_prompt: str) -> AsyncGenerator[str, None]:
+        raise NotImplementedError("GeminiProvider does not support streaming")
+
+
 def get_llm_provider() -> LLMProvider:
     """Factory returning the configured LLM provider."""
     provider_name = settings.llm_provider.lower().strip()
@@ -321,4 +395,40 @@ def get_llm_provider() -> LLMProvider:
             api_key=settings.effective_groq_api_key,
             model=settings.llm_model,
             timeout_seconds=settings.llm_timeout_seconds,
+        )
+
+
+def get_report_llm_provider() -> LLMProvider:
+    """Factory returning the LLM provider specifically for report synthesis."""
+    provider_name = settings.report_llm_provider.lower().strip()
+    if provider_name == "gemini":
+        if not settings.gemini_api_key:
+            logger.warning("GEMINI_API_KEY not configured — falling back to MockLLMProvider for reports.")
+            return MockLLMProvider()
+        return GeminiProvider(
+            api_key=settings.gemini_api_key,
+            model=settings.report_llm_model,
+            timeout_seconds=settings.report_llm_timeout_seconds,
+        )
+    elif provider_name == "groq":
+        return GroqProvider(
+            api_key=settings.effective_groq_api_key,
+            model=settings.report_llm_model or settings.llm_model,
+            timeout_seconds=settings.report_llm_timeout_seconds,
+        )
+    elif provider_name == "ollama":
+        return OllamaProvider(
+            model=settings.report_llm_model or settings.llm_model,
+            timeout_seconds=settings.report_llm_timeout_seconds,
+        )
+    elif provider_name == "mock":
+        return MockLLMProvider()
+    else:
+        logger.warning("Unknown REPORT_LLM_PROVIDER '%s', defaulting to Gemini.", provider_name)
+        if not settings.gemini_api_key:
+            return MockLLMProvider()
+        return GeminiProvider(
+            api_key=settings.gemini_api_key,
+            model=settings.report_llm_model,
+            timeout_seconds=settings.report_llm_timeout_seconds,
         )

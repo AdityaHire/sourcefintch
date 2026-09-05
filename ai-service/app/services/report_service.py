@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from app.config import settings
-from app.services.llm_service import get_llm_provider
+from app.services.llm_service import get_report_llm_provider
 from app.services.node_internal_client import async_internal_get
 
 logger = logging.getLogger(__name__)
@@ -86,11 +86,11 @@ def detect_language(file_path: str, explicit_lang: Optional[str] = None) -> str:
 def categorize_dependency(dep_name: str) -> str:
     """Categorize a library or package by functional role."""
     name = dep_name.lower()
-    if any(k in name for k in ["react", "vue", "svelte", "angular", "next", "vite", "express", "fastapi", "flask", "django", "nest"]):
+    if any(k in name for k in ["react", "vue", "svelte", "angular", "next", "vite", "express", "fastapi", "flask", "django", "nest", "uvicorn", "gunicorn", "starlette"]):
         return "Framework & Runtime"
     if any(k in name for k in ["mysql", "postgres", "pg", "mongo", "redis", "prisma", "sequelize", "qdrant", "chroma", "sqlite", "typeorm", "sqlalchemy"]):
         return "Database & Store"
-    if any(k in name for k in ["clerk", "auth", "jwt", "passport", "bcrypt", "helmet", "rate-limit"]):
+    if any(k in name for k in ["clerk", "auth", "jwt", "passport", "bcrypt", "helmet", "rate-limit", "python-jose", "pyjwt", "oauth"]):
         return "Auth & Security"
     if any(k in name for k in ["groq", "openai", "sentence-transformers", "langchain", "llama", "huggingface", "transformers", "torch"]):
         return "AI & Machine Learning"
@@ -152,6 +152,88 @@ def extract_requirements_txt(content: str) -> List[Dict[str, Any]]:
     return deps
 
 
+def extract_pyproject_toml(content: str) -> List[Dict[str, Any]]:
+    """Parse pyproject.toml into structured dependencies."""
+    deps = []
+    try:
+        import tomli
+        data = tomli.loads(content)
+        project = data.get("project", {})
+        for dep in project.get("dependencies", []):
+            parts = re.split(r"[><=~]+", dep, 1)
+            name = parts[0].strip()
+            ver = parts[1].strip() if len(parts) > 1 else "latest"
+            if name:
+                deps.append({
+                    "name": name,
+                    "version": ver,
+                    "type": "runtime",
+                    "category": categorize_dependency(name),
+                })
+        poetry = data.get("tool", {}).get("poetry", {})
+        for name, meta in poetry.get("dependencies", {}).items():
+            if name.lower() == "python":
+                continue
+            ver = "latest"
+            if isinstance(meta, str):
+                ver = meta.lstrip("^~>=<")
+            elif isinstance(meta, dict):
+                ver = meta.get("version", "latest")
+            deps.append({
+                "name": name,
+                "version": ver,
+                "type": "runtime",
+                "category": categorize_dependency(name),
+            })
+    except Exception as exc:
+        logger.debug("Failed to parse pyproject.toml: %s", exc)
+    return deps
+
+
+def extract_setup_py(content: str) -> List[Dict[str, Any]]:
+    """Parse setup.py for install_requires using regex."""
+    deps = []
+    match = re.search(r"install_requires\s*=\s*\[(.*?)\]", content, re.DOTALL)
+    if match:
+        inner = match.group(1)
+        for dep in re.findall(r"['\"]([^'\"]+)['\"]", inner):
+            parts = re.split(r"[><=~]+", dep, 1)
+            name = parts[0].strip()
+            ver = parts[1].strip() if len(parts) > 1 else "latest"
+            if name:
+                deps.append({
+                    "name": name,
+                    "version": ver,
+                    "type": "runtime",
+                    "category": categorize_dependency(name),
+                })
+    return deps
+
+
+def extract_pipfile(content: str) -> List[Dict[str, Any]]:
+    """Parse Pipfile for packages."""
+    deps = []
+    in_packages = False
+    for line in content.splitlines():
+        line = line.strip()
+        if line.lower().startswith("[packages]"):
+            in_packages = True
+            continue
+        if line.startswith("["):
+            in_packages = False
+        if in_packages and "=" in line:
+            name = line.split("=")[0].strip().strip('"').strip("'")
+            ver = line.split("=")[1].strip().strip('"').strip("'") if len(line.split("=")) > 1 else "latest"
+            if name:
+                deps.append({
+                    "name": name,
+                    "version": ver,
+                    "type": "runtime",
+                    "category": categorize_dependency(name),
+                })
+    return deps
+
+
 def analyze_static_repo(files: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Extract deterministic static metrics from all repository files."""
     total_files = len(files)
@@ -181,7 +263,7 @@ def analyze_static_repo(files: List[Dict[str, Any]]) -> Dict[str, Any]:
     for f in files:
         path = f.get("file_path", "")
         content = f.get("content") or ""
-        size = f.get("file_size", len(content.encode("utf-8", errors="replace")))
+        size = f.get("file_size") or len(content.encode("utf-8", errors="replace"))
         lines = len(content.splitlines()) if content else 0
 
         total_bytes += size
@@ -219,6 +301,15 @@ def analyze_static_repo(files: List[Dict[str, Any]]) -> Dict[str, Any]:
         elif base_name in ("requirements.txt", "requirements-dev.txt"):
             manifests.append(path)
             all_dependencies.extend(extract_requirements_txt(content))
+        elif base_name == "pyproject.toml":
+            manifests.append(path)
+            all_dependencies.extend(extract_pyproject_toml(content))
+        elif base_name == "setup.py":
+            manifests.append(path)
+            all_dependencies.extend(extract_setup_py(content))
+        elif base_name == "Pipfile":
+            manifests.append(path)
+            all_dependencies.extend(extract_pipfile(content))
         elif base_name == "Cargo.toml":
             manifests.append(path)
         elif base_name == "go.mod":
@@ -291,7 +382,7 @@ def analyze_static_repo(files: List[Dict[str, Any]]) -> Dict[str, Any]:
             "languages": languages,
         },
         "manifests": manifests,
-        "dependencies": deduped_deps[:80],
+        "dependencies": deduped_deps,
         "scripts": scripts,
         "entry_points": entry_points[:10],
         "key_directories": key_directories,
@@ -308,6 +399,15 @@ Return ONLY a valid JSON object matching this exact schema:
   "executive_summary": "Crisp 2-3 sentence overview of what the application does, its core value proposition, and intended users.",
   "architecture_style": "Specific architectural pattern label (e.g. '3-Tier Monorepo with RAG Microservice and SSE Streaming')",
   "architecture_deep_dive": "Exhaustive, professional Markdown text detailing the architecture, subsystems, data flow, key patterns, and communication protocols. Use headings (###), bullet points, and code spans.",
+  "tech_stack_summary": "Concise summary of the primary languages, frameworks, and libraries based on the inventory.",
+  "top_level_architecture": "Brief description of the top-level architecture, tiers, and how major components communicate.",
+  "repository_layout": "Description of the repository layout, key directories, and how they map to responsibilities.",
+  "quick_start": "Short quick-start guidance inferred from manifests and entry points.",
+  "prerequisites": ["List of likely prerequisites based on detected tech, e.g. Node.js, Python, MySQL, Qdrant"],
+  "setup_instructions": ["Step-by-step setup steps inferred from the repo structure and manifests"],
+  "configuration_environment": ["List of config files or env keys inferred from the repo, e.g. .env.example, config files"],
+  "backend_description": "Short description of backend structure, frameworks, and API organization.",
+  "frontend_apis_description": "List or summary of detected frontend-facing API endpoints and their purpose.",
   "key_features": [
     { "title": "Feature Name", "description": "Crisp description of implementation and purpose" }
   ],
@@ -329,52 +429,125 @@ Ensure all insights are grounded in the provided project inventory. Do not retur
 """
 
 
+def generate_recommended_questions(repo_name: str, static_data: Dict[str, Any]) -> List[str]:
+    """Generate deterministic recommended exploration questions based on detected tech."""
+    questions: List[str] = []
+    langs = [l["language"] for l in static_data["metrics"]["languages"][:5]]
+    frameworks = [d["name"] for d in static_data["dependencies"] if d["category"] == "Framework & Runtime"]
+    dbs = [d["name"] for d in static_data["dependencies"] if d["category"] == "Database & Store"]
+    auths = [d["name"] for d in static_data["dependencies"] if d["category"] == "Auth & Security"]
+    testing = [d["name"] for d in static_data["dependencies"] if d["category"] == "Testing & QA"]
+    ai_ml = [d["name"] for d in static_data["dependencies"] if d["category"] == "AI & Machine Learning"]
+
+    if frameworks:
+        questions.append(f"How are {', '.join(frameworks[:3])} used in {repo_name}, and what do they each own?")
+    if dbs:
+        questions.append(f"What database layer and ORM does {repo_name} use, and how is data accessed?")
+    if auths:
+        questions.append(f"How is authentication and authorization handled in {repo_name}?")
+    if testing:
+        questions.append(f"What is the testing strategy for {repo_name} and how do I run the test suite?")
+    if ai_ml:
+        questions.append(f"How does {repo_name} integrate AI/ML capabilities, and what models or services does it use?")
+    if static_data["detected_apis"]:
+        questions.append(f"Can you trace a request through {repo_name}'s API layer from route to response?")
+    questions.append(f"What are the main architectural patterns and design decisions in {repo_name}?")
+    questions.append(f"How would I set up a local development environment for {repo_name}?")
+    questions.append(f"What are the potential security and performance bottlenecks in {repo_name}?")
+    return questions[:8]
+
+
 async def generate_ai_synthesis(
     repo_name: str,
     branch: str,
     static_data: Dict[str, Any],
+    files: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Call LLM to synthesize deep architectural intelligence from static repository metrics."""
     top_langs = [f"{l['language']} ({l['percentage']}%)" for l in static_data["metrics"]["languages"][:5]]
-    deps_summary = [f"{d['name']} ({d['category']})" for d in static_data["dependencies"][:25]]
+    deps_summary = [f"{d['name']} ({d['category']})" for d in static_data["dependencies"][:50]]
     entry_summary = [f"{e['file_path']} ({e['language']})" for e in static_data["entry_points"]]
-    api_summary = [f"{a['method']} {a['path']}" for a in static_data["detected_apis"][:15]]
+    api_summary = [f"{a['method']} {a['path']}" for a in static_data["detected_apis"]]
+
+    file_samples = ""
+    if files:
+        key_files = []
+        key_names = {e["name"] for e in static_data["entry_points"]}
+        for f in files:
+            base = os.path.basename(f.get("file_path", ""))
+            if base in key_names or base.lower() in ("readme.md", "package.json", "requirements.txt", "dockerfile", "makefile"):
+                content = f.get("content") or ""
+                if content:
+                    key_files.append(f"--- {f.get('file_path')} ---\n{content[:800]}")
+            if len(key_files) >= 8:
+                break
+        if key_files:
+            file_samples = "\n\nKey file samples:\n" + "\n\n".join(key_files)
 
     user_prompt = f"""Repository: {repo_name} (branch: {branch})
-Total Files: {static_data['metrics']['total_files']} | Total Lines: {static_data['metrics']['total_lines']}
+Total Files: {static_data['metrics']['total_files']} | Total Lines: {static_data['metrics']['total_lines']} | Total Size: {static_data['metrics']['total_size_bytes']} bytes
 Languages: {', '.join(top_langs)}
 Manifests: {', '.join(static_data['manifests']) if static_data['manifests'] else 'None'}
 Key Dependencies: {', '.join(deps_summary) if deps_summary else 'Standard library / None listed'}
 Entry Points: {', '.join(entry_summary) if entry_summary else 'Standard structure'}
 Detected API Routes: {', '.join(api_summary) if api_summary else 'Client/Library or routes not identified'}
 
-Key Directories: {', '.join([d['path'] for d in static_data['key_directories']])}
+Key Directories:
+{chr(10).join([f"- {d['path']}/ ({d['file_count']} files)" for d in static_data['key_directories']])}
 
 README excerpt:
-{static_data['readme_snippet'][:1500] if static_data['readme_snippet'] else 'No README provided'}
+{static_data['readme_snippet'][:3000] if static_data['readme_snippet'] else 'No README provided'}
+{file_samples}
 
 Synthesize the full architecture intelligence report JSON now:"""
 
     try:
-        llm = get_llm_provider()
+        logger.info("Calling report LLM provider=%s model=%s for repo=%s branch=%s", 
+                    settings.report_llm_provider, settings.report_llm_model, repo_name, branch)
+        llm = get_report_llm_provider()
+        logger.info("LLM provider instantiated: %s", type(llm).__name__)
         result = await llm.generate_answer(
             system_prompt=REPORT_SYNTHESIS_SYSTEM_PROMPT,
             user_prompt=user_prompt,
         )
+        logger.info("LLM response received, length=%d chars", len(result.answer))
 
         raw = result.answer.strip()
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
 
         parsed = json.loads(raw)
+        if "recommended_questions" not in parsed or not parsed["recommended_questions"]:
+            parsed["recommended_questions"] = generate_recommended_questions(repo_name, static_data)
+        logger.info("LLM synthesis succeeded for repo=%s", repo_name)
         return parsed
     except Exception as exc:
-        logger.warning("LLM architectural synthesis failed or returned invalid JSON: %s", exc)
-        # Construct deterministic fallback
+        logger.error("LLM architectural synthesis FAILED for repo=%s: type=%s error=%s", repo_name, type(exc).__name__, exc, exc_info=True)
         return {
             "executive_summary": f"A {', '.join(top_langs[:2]) or 'codebase'} application organized across {static_data['metrics']['total_files']} files with modular directory structure.",
             "architecture_style": "Modular Multi-Tier Application",
             "architecture_deep_dive": f"### Architecture Overview\n\nThe repository `{repo_name}` is composed of {static_data['metrics']['total_files']} files across {len(static_data['key_directories'])} primary directories. Core technologies include {', '.join(top_langs[:3])}.\n\n### Key Components\n- **Entry Points**: {', '.join(entry_summary) if entry_summary else 'Standard structure'}\n- **Dependencies**: Includes {len(static_data['dependencies'])} external libraries spanning frameworks and storage layers.",
+            "tech_stack_summary": f"Primary languages: {', '.join(top_langs[:3]) or 'Mixed'}. Key frameworks and libraries: {', '.join(d['name'] for d in static_data['dependencies'][:15]) or 'Standard library'}.",
+            "top_level_architecture": f"Modular multi-tier application with {len(static_data['key_directories'])} core directories. Communication flows through {', '.join(entry_summary) if entry_summary else 'standard entry points'} with {'REST API endpoints' if static_data['detected_apis'] else 'internal modules'}.",
+            "repository_layout": f"Structured into {len(static_data['key_directories'])} top-level directories: {', '.join([d['path'] for d in static_data['key_directories']])}. Entry points: {', '.join(entry_summary) if entry_summary else 'standard app files'}.",
+            "quick_start": f"1. Install dependencies ({'npm install' if 'package.json' in static_data['manifests'] else 'pip install -r requirements.txt' if 'requirements.txt' in static_data['manifests'] else 'install project dependencies'}).\n2. Configure environment variables.\n3. Run the application ({', '.join([e['name'] for e in static_data['entry_points']]) or 'app entry point'}).",
+            "prerequisites": [
+                "Node.js 18+",
+                "Python 3.9+",
+                "MySQL 8.0+",
+                "Git",
+                *( ["REST client / Postman"] if static_data['detected_apis'] else [] ),
+            ],
+            "setup_instructions": [
+                "Clone the repository",
+                "Install dependencies",
+                "Configure environment variables",
+                "Run database migrations if applicable",
+                "Start the application",
+            ],
+            "configuration_environment": static_data['manifests'] if static_data['manifests'] else ["Standard environment configuration"],
+            "backend_description": f"Backend exposes {len(static_data['detected_apis'])} API endpoints across {len(set(a['file'] for a in static_data['detected_apis']))} files." if static_data['detected_apis'] else "Backend logic is distributed across service and utility modules.",
+            "frontend_apis_description": ", ".join([f"{a['method']} {a['path']}" for a in static_data['detected_apis']]) if static_data['detected_apis'] else "No explicit API routes detected.",
             "key_features": [
                 {"title": "Modular Code Organization", "description": f"Structured across {len(static_data['key_directories'])} core directories with clean separation."},
                 {"title": "Multi-Language Ecosystem", "description": f"Built primarily with {', '.join(top_langs[:2])}."},
@@ -383,15 +556,10 @@ Synthesize the full architecture intelligence report JSON now:"""
                 {"aspect": "Code Organization", "observation": "Clean separation of source files and configurations."},
             ],
             "onboarding_guide": [
-                {"step": 1, "title": "Explore Entry Points", "detail": f"Inspect primary entry points: {', '.join(entry_summary[:2]) or 'root files'}."},
+                {"step": 1, "title": "Explore Entry Points", "detail": f"Inspect primary entry points: {', '.join([e['file_path'] for e in static_data['entry_points'][:2]]) or 'root files'}."},
                 {"step": 2, "title": "Review Dependencies", "detail": "Inspect package manifests for required runtime dependencies and build scripts."},
             ],
-            "recommended_questions": [
-                f"How is the data flow structured in {repo_name}?",
-                "Explain the role of the primary entry points.",
-                "What are the main external dependencies and what are they used for?",
-                "How would I add a new feature or endpoint to this project?",
-            ],
+            "recommended_questions": generate_recommended_questions(repo_name, static_data),
         }
 
 
@@ -401,7 +569,7 @@ async def generate_repository_report(repository_id: int) -> Dict[str, Any]:
 
     # 1. Fetch repo metadata from Node
     repo_res = await async_internal_get(
-        f"{settings.node_api_base_url}/api/repositories/{repository_id}",
+        f"{settings.node_api_url}/api/repositories/{repository_id}",
         timeout=15.0,
     )
     if repo_res.status_code != 200:
@@ -410,7 +578,7 @@ async def generate_repository_report(repository_id: int) -> Dict[str, Any]:
 
     # 2. Fetch all files from Node
     files_res = await async_internal_get(
-        f"{settings.node_api_base_url}/api/repositories/{repository_id}/files",
+        f"{settings.node_api_url}/api/repositories/{repository_id}/files?include_content=true",
         timeout=30.0,
     )
     if files_res.status_code != 200:
@@ -425,6 +593,7 @@ async def generate_repository_report(repository_id: int) -> Dict[str, Any]:
         repo_name=repo_data.get("name", f"Repo-{repository_id}"),
         branch=repo_data.get("branch", "main"),
         static_data=static_data,
+        files=files,
     )
 
     # 5. Assemble complete report

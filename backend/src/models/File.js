@@ -75,6 +75,15 @@ const findByRepositoryId = async (repositoryId) => {
   return rows;
 };
 
+/**
+ * Returns full file listing including content column, for report generation.
+ */
+const findByRepositoryIdWithContent = async (repositoryId) => {
+  const sql = 'SELECT id, repository_id, file_path, language, file_size, content FROM files WHERE repository_id = ? ORDER BY file_path';
+  const [rows] = await pool.execute(sql, sqlParams([repositoryId]));
+  return rows;
+};
+
 const findByRepoAndPath = async (repositoryId, filePath) => {
   const sql = 'SELECT * FROM files WHERE repository_id = ? AND file_path = ? LIMIT 1';
   const [rows] = await pool.execute(sql, sqlParams([repositoryId, filePath]));

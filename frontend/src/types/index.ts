@@ -124,6 +124,15 @@ export interface AIAnalysis {
   executive_summary: string;
   architecture_style: string;
   architecture_deep_dive: string;
+  tech_stack_summary?: string;
+  top_level_architecture?: string;
+  repository_layout?: string;
+  quick_start?: string;
+  prerequisites?: string[];
+  setup_instructions?: string[];
+  configuration_environment?: string[];
+  backend_description?: string;
+  frontend_apis_description?: string;
   key_features: Array<{ title: string; description: string }>;
   security_and_performance: Array<{ aspect: string; observation: string; recommendation?: string }>;
   onboarding_guide: Array<{ step: number; title: string; detail: string }>;

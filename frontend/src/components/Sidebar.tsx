@@ -744,8 +744,8 @@ function SidebarUserRowExpanded({
             <div className="h-7 w-7 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 flex items-center justify-center text-[11px] font-semibold shrink-0">{initials}</div>
           )}
           <div className="flex-1 min-w-0">
-            <div className="text-[12px] font-semibold text-zinc-900 dark:text-white truncate font-sans-ui">{userLoaded ? displayName : '…'}</div>
-            {primaryEmail && <div className="text-[10.5px] text-zinc-500 dark:text-zinc-400 truncate font-sans-ui">{primaryEmail}</div>}
+            <div className="text-[12px] font-semibold text-zinc-900 dark:text-white truncate font-sans-ui">{userLoaded ? (primaryEmail || displayName) : '…'}</div>
+            {primaryEmail && <div className="text-[10.5px] text-zinc-500 dark:text-zinc-400 truncate font-sans-ui">{displayName}</div>}
           </div>
         </button>
       </UserButton>

@@ -964,7 +964,7 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
 
         {/* ── 3. Bottom Composer: Floating PromptInputBox ───────────────────── */}
         <div className="relative z-10 px-4 pb-5 pt-1 shrink-0 bg-transparent">
-          <div className="max-w-2xl mx-auto w-full">
+          <div className="max-w-3xl mx-auto w-full">
             <PromptInputBox
               ref={composerRef}
               placeholder={
