@@ -50,6 +50,14 @@ export function useApiClient() {
         api.createConversation(authedFetch, repositoryId, title),
       fetchConversation: (conversationId: number) =>
         api.fetchConversation(authedFetch, conversationId),
+      fetchConversations: (repositoryId?: number) =>
+        api.fetchConversations(authedFetch, repositoryId),
+      updateConversation: (conversationId: number, title: string) =>
+        api.updateConversation(authedFetch, conversationId, title),
+      deleteConversation: (conversationId: number) =>
+        api.deleteConversation(authedFetch, conversationId),
+      deleteAllConversations: (repositoryId: number) =>
+        api.deleteAllConversations(authedFetch, repositoryId),
       createRepository: (githubUrl: string, branch?: string) =>
         api.createRepository(authedFetch, githubUrl, branch),
       getRepository: (id: number) => api.getRepository(authedFetch, id),

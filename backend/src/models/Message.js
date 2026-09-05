@@ -74,4 +74,11 @@ const remove = async (id) => {
   return result.affectedRows > 0;
 };
 
-module.exports = { create, findById, findByConversationId, remove };
+const removeByConversationId = async (conversationId) => {
+  const sql = 'DELETE FROM messages WHERE conversation_id = ?';
+  const [result] = await pool.execute(sql, sqlParams([conversationId]));
+  return result.affectedRows > 0;
+};
+
+module.exports = { create, findById, findByConversationId, remove, removeByConversationId };
+

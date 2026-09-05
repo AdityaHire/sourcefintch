@@ -14,14 +14,20 @@ const {
   createConversation,
   getConversation,
   listConversations,
+  updateConversation,
+  deleteConversation,
+  deleteAllConversations,
 } = require('../controllers/conversation.controller');
 
 const router = Router();
 
 router.get('/', requireAuth, listConversations);
 router.post('/', requireAuth, createConversation);
+router.delete('/', requireAuth, deleteAllConversations);
 
 // AI service fetches history with x-internal-secret; users fetch with session token.
 router.get('/:id', requireAuthOrInternal, getConversation);
+router.patch('/:id', requireAuth, updateConversation);
+router.delete('/:id', requireAuth, deleteConversation);
 
 module.exports = router;

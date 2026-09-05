@@ -96,8 +96,86 @@ const listConversations = async (req, res, next) => {
   }
 };
 
+const updateConversation = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { title } = req.body;
+    const currentUserId = userId(req);
+
+    const conv = await Conversation.findById(id);
+    if (!conv || conv.user_id !== currentUserId) {
+      const err = new Error('Conversation not found');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    if (!title || typeof title !== 'string' || !title.trim()) {
+      const err = new Error('title is required');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const updated = await Conversation.update(id, { title: title.trim() });
+    res.json(updated);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteConversation = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const currentUserId = userId(req);
+
+    const conv = await Conversation.findById(id);
+    if (!conv) {
+      return res.json({ success: true, id: Number(id) });
+    }
+
+    if (String(conv.user_id) !== String(currentUserId)) {
+      const err = new Error('Conversation not found');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    await Message.removeByConversationId(id);
+    const success = await Conversation.remove(id);
+    res.json({ success: Boolean(success), id: Number(id) });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteAllConversations = async (req, res, next) => {
+  try {
+    const { repository_id } = req.query;
+    const currentUserId = userId(req);
+
+    if (!repository_id || isNaN(Number(repository_id))) {
+      const err = new Error('repository_id query param is required');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const allForRepo = await Conversation.findByRepositoryId(repository_id);
+    const userConvs = allForRepo.filter((c) => String(c.user_id) === String(currentUserId));
+
+    for (const conv of userConvs) {
+      await Message.removeByConversationId(conv.id);
+      await Conversation.remove(conv.id);
+    }
+
+    res.json({ success: true, deleted_count: userConvs.length });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createConversation,
   getConversation,
   listConversations,
+  updateConversation,
+  deleteConversation,
+  deleteAllConversations,
 };

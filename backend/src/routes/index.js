@@ -17,8 +17,10 @@ const router = Router();
 
 router.use('/health', healthRoutes);
 router.use('/repositories', repositoriesRoutes);
+router.use('/repository', repositoriesRoutes);
 router.use('/chunks', chunkRoutes);
 router.use('/conversations', conversationRoutes);
+router.use('/conversation', conversationRoutes);
 router.use('/chat', chatRoutes);
 
 module.exports = router;

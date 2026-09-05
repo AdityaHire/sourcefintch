@@ -80,6 +80,49 @@ export async function fetchConversation(
   return jsonOrThrow(res, 'Failed to fetch conversation');
 }
 
+export async function fetchConversations(
+  authedFetch: AuthedFetch,
+  repositoryId?: number
+): Promise<Conversation[]> {
+  const endpoint = repositoryId
+    ? apiUrl(`/api/conversations?repository_id=${repositoryId}`)
+    : apiUrl('/api/conversations');
+  const res = await authedFetch(endpoint);
+  return jsonOrThrow(res, 'Failed to fetch conversations');
+}
+
+export async function updateConversation(
+  authedFetch: AuthedFetch,
+  conversationId: number,
+  title: string
+): Promise<Conversation> {
+  const res = await authedFetch(apiUrl(`/api/conversations/${conversationId}`), {
+    method: 'PATCH',
+    body: JSON.stringify({ title }),
+  });
+  return jsonOrThrow(res, 'Failed to update conversation');
+}
+
+export async function deleteConversation(
+  authedFetch: AuthedFetch,
+  conversationId: number
+): Promise<{ success: boolean; id: number }> {
+  const res = await authedFetch(apiUrl(`/api/conversations/${conversationId}`), {
+    method: 'DELETE',
+  });
+  return jsonOrThrow(res, 'Failed to delete conversation');
+}
+
+export async function deleteAllConversations(
+  authedFetch: AuthedFetch,
+  repositoryId: number
+): Promise<{ success: boolean; deleted_count: number }> {
+  const res = await authedFetch(apiUrl(`/api/conversations?repository_id=${repositoryId}`), {
+    method: 'DELETE',
+  });
+  return jsonOrThrow(res, 'Failed to clear conversations');
+}
+
 export async function createRepository(
   authedFetch: AuthedFetch,
   githubUrl: string,

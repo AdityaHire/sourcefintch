@@ -28,7 +28,10 @@ import {
   FolderGit2,
   Clock,
   FolderTree,
+  History,
 } from 'lucide-react';
+import { ConversationHistoryDrawer } from './ConversationHistoryDrawer';
+import type { Conversation } from '../types';
 import {
   PromptInputBox,
   type PromptInputBoxHandle,
@@ -72,6 +75,9 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
   const [repoFiles, setRepoFiles] = useState<RepositoryFile[]>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
   const [selectedFile, setSelectedFile] = useState<RepositoryFile | null>(null);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<PromptInputBoxHandle>(null);
@@ -185,9 +191,7 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
   };
 
   // ── New Chat in current repository ────────────────────────────────────────
-  const handleNewChat = async () => {
-    if (!selectedRepoId) return;
-
+  const handleNewChat = () => {
     setPersistenceWarning(false);
     setConversationId(null);
     setMessages([]);
@@ -199,18 +203,99 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
     url.searchParams.delete('conversationId');
     window.history.pushState(null, '', url.pathname + url.search);
 
-    try {
-      const newConv = await api.createConversation(selectedRepoId);
-      setConversationId(newConv.id);
-      const url = new URL(window.location.href);
-      url.searchParams.set('conversationId', String(newConv.id));
-      window.history.pushState(null, '', url.pathname + url.search);
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to create new conversation');
-    }
-
     composerRef.current?.focus();
   };
+
+  // ── Conversation History Loader & Handlers ───────────────────────────────
+  const loadConversations = useCallback(
+    async (repoId: number) => {
+      setIsLoadingHistory(true);
+      try {
+        const list = await api.fetchConversations(repoId);
+        setConversations(list);
+      } catch (err: any) {
+        console.error('Failed to load conversations:', err);
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    },
+    [api]
+  );
+
+  useEffect(() => {
+    if (selectedRepoId) {
+      loadConversations(selectedRepoId);
+    } else {
+      setConversations([]);
+    }
+  }, [selectedRepoId, loadConversations]);
+
+  const handleSelectConversation = async (convId: number) => {
+    if (convId === conversationId) {
+      setIsHistoryOpen(false);
+      return;
+    }
+    setConversationId(convId);
+    setIsLoadingConv(true);
+    setErrorMessage(null);
+    setSelectedCitation(null);
+    setIsCodeViewerOpen(false);
+    setIsHistoryOpen(false);
+
+    const url = new URL(window.location.href);
+    url.searchParams.set('conversationId', String(convId));
+    window.history.pushState(null, '', url.pathname + url.search);
+
+    try {
+      const convData = await api.fetchConversation(convId);
+      setMessages(convData.messages || []);
+      const firstWithSources = convData.messages?.find(
+        (m) => m.role === 'assistant' && m.sources && m.sources.length > 0
+      );
+      if (firstWithSources && firstWithSources.sources?.[0]) {
+        setSelectedCitation(firstWithSources.sources[0]);
+      }
+    } catch (err: any) {
+      setErrorMessage(`Failed to load conversation #${convId}: ${err.message}`);
+    } finally {
+      setIsLoadingConv(false);
+    }
+  };
+
+  const handleRenameConversation = async (convId: number, newTitle: string) => {
+    try {
+      const updated = await api.updateConversation(convId, newTitle);
+      setConversations((prev) =>
+        prev.map((c) => (c.id === convId ? { ...c, title: updated.title } : c))
+      );
+    } catch (err: any) {
+      setErrorMessage(`Failed to rename conversation: ${err.message}`);
+    }
+  };
+
+  const handleDeleteConversation = async (convId: number) => {
+    try {
+      await api.deleteConversation(convId);
+      setConversations((prev) => prev.filter((c) => c.id !== convId));
+      if (conversationId === convId) {
+        handleNewChat();
+      }
+    } catch (err: any) {
+      setErrorMessage(`Failed to delete conversation: ${err.message}`);
+    }
+  };
+
+  const handleClearAllConversations = async () => {
+    if (!selectedRepoId) return;
+    try {
+      await api.deleteAllConversations(selectedRepoId);
+      setConversations([]);
+      handleNewChat();
+    } catch (err: any) {
+      setErrorMessage(`Failed to clear conversations: ${err.message}`);
+    }
+  };
+
 
   const handleRepoAdded = (newRepo: Repository) => {
     setRepositories((prev) => [newRepo, ...prev.filter((r) => r.id !== newRepo.id)]);
@@ -277,6 +362,9 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
               const url = new URL(window.location.href);
               url.searchParams.set('conversationId', String(convId));
               window.history.pushState(null, '', url.pathname + url.search);
+              if (selectedRepoId) {
+                loadConversations(selectedRepoId);
+              }
             }
           },
           onCitations: (sources) => {
@@ -304,6 +392,9 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
                 msg.id === assistantMsgId ? { ...msg, id: savedId } : msg
               )
             );
+            if (selectedRepoId) {
+              loadConversations(selectedRepoId);
+            }
           },
           onError: (err) => {
             setErrorMessage(err);
@@ -484,6 +575,27 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
             >
               <Code className="w-3.5 h-3.5" />
               <span>{isCodeViewerOpen ? 'Hide Code' : 'Show Code'}</span>
+            </button>
+
+            {/* History toggle button */}
+            <button
+              type="button"
+              onClick={() => setIsHistoryOpen((prev) => !prev)}
+              disabled={!selectedRepoId}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer shadow-xs font-sans-ui disabled:opacity-40 disabled:cursor-not-allowed ${
+                isHistoryOpen
+                  ? 'bg-zinc-900 dark:bg-white/15 text-white ring-1 ring-zinc-700 dark:ring-white/10 hover:bg-zinc-800 dark:hover:bg-white/20'
+                  : 'bg-zinc-100 dark:bg-white/[0.06] text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-white/10 hover:text-zinc-900 dark:hover:text-white'
+              }`}
+              title="View past conversations"
+            >
+              <History className="w-3.5 h-3.5" />
+              <span>History</span>
+              {conversations.length > 0 && (
+                <span className="rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-[10px] px-1.5 py-0.2 font-code">
+                  {conversations.length}
+                </span>
+              )}
             </button>
 
             {/* Primary Action: + New Chat */}
@@ -762,6 +874,21 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── Conversation History Drawer ─────────────────────────────────── */}
+      <ConversationHistoryDrawer
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        conversations={conversations}
+        activeConversationId={conversationId}
+        onSelectConversation={handleSelectConversation}
+        onNewChat={handleNewChat}
+        onRenameConversation={handleRenameConversation}
+        onDeleteConversation={handleDeleteConversation}
+        onClearAllConversations={handleClearAllConversations}
+        isLoading={isLoadingHistory}
+        repoName={activeRepo?.name}
+      />
     </div>
   );
 }
