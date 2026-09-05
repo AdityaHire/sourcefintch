@@ -6,9 +6,11 @@ Gemini, OpenAI) can be swapped via LLM_PROVIDER in .env without modifying
 retrieval, prompt construction, or RAG orchestration.
 """
 
+import asyncio
+import json
 import logging
 from dataclasses import dataclass
-from typing import Optional, Protocol
+from typing import AsyncGenerator, Optional, Protocol
 
 from fastapi import HTTPException
 import httpx
@@ -51,21 +53,11 @@ class LLMProvider(Protocol):
     """Protocol defining the interface for all LLM providers."""
 
     async def generate_answer(self, system_prompt: str, user_prompt: str) -> LLMResult:
-        """Generate a natural language answer from system and user prompts.
+        """Generate a natural language answer from system and user prompts."""
+        ...
 
-        Args:
-            system_prompt: High-level instructions, rules, and citation constraints.
-            user_prompt: User question and retrieved context blocks.
-
-        Returns:
-            An ``LLMResult`` with the generated text and optional provider
-            token-usage metadata.
-
-        Raises:
-            GroqAPIError: On 413 or 429 from Groq (preserves status_code).
-            HTTPException(504): If the provider call times out.
-            HTTPException(502): If the provider API returns an error or is unreachable.
-        """
+    async def stream_answer(self, system_prompt: str, user_prompt: str) -> AsyncGenerator[str, None]:
+        """Stream generated text tokens from system and user prompts."""
         ...
 
 
@@ -153,6 +145,65 @@ class GroqProvider:
                 detail=f"Failed to connect to LLM provider: {exc}",
             )
 
+    async def stream_answer(self, system_prompt: str, user_prompt: str) -> AsyncGenerator[str, None]:
+        if not self.api_key:
+            logger.error("Groq API key is not configured.")
+            raise HTTPException(
+                status_code=500,
+                detail="GROQ_API_KEY is not configured. Please set GROQ_API_KEY in .env",
+            )
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "temperature": 0.1,
+            "max_tokens": 8192,
+            "stream": True,
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+                async with client.stream("POST", self.API_URL, headers=headers, json=payload) as response:
+                    if response.status_code != 200:
+                        err_body = await response.aread()
+                        err_text = err_body.decode(errors="replace")
+                        logger.error("Groq stream returned status %s: %s", response.status_code, err_text[:200])
+                        if response.status_code in (413, 429):
+                            raise GroqAPIError(status_code=response.status_code, detail=err_text)
+                        raise HTTPException(status_code=502, detail=f"Groq API error ({response.status_code}): {err_text}")
+
+                    async for line in response.aiter_lines():
+                        line = line.strip()
+                        if not line or not line.startswith("data: "):
+                            continue
+                        data_str = line[6:].strip()
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            data = json.loads(data_str)
+                            choice = data.get("choices", [{}])[0] if data.get("choices") else {}
+                            delta = choice.get("delta", {})
+                            content = delta.get("content")
+                            if content:
+                                yield content
+                        except json.JSONDecodeError:
+                            continue
+        except httpx.TimeoutException as exc:
+            logger.error("Groq stream timed out: %s", exc)
+            raise HTTPException(status_code=504, detail=f"LLM stream timed out after {self.timeout_seconds}s")
+        except (GroqAPIError, HTTPException):
+            raise
+        except Exception as exc:
+            logger.error("Groq stream unexpected error: %s", exc)
+            raise HTTPException(status_code=502, detail=f"Failed to stream from LLM: {exc}")
+
 
 class OllamaProvider:
     """Local Ollama provider (for 100% offline, zero-network setups)."""
@@ -187,6 +238,38 @@ class OllamaProvider:
         except Exception as exc:
             raise HTTPException(status_code=502, detail=f"Failed to reach Ollama: {exc}")
 
+    async def stream_answer(self, system_prompt: str, user_prompt: str) -> AsyncGenerator[str, None]:
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "stream": True,
+            "options": {"temperature": 0.1},
+        }
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+                async with client.stream("POST", self.API_URL, json=payload) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            data = json.loads(line)
+                            content = data.get("message", {}).get("content", "")
+                            if content:
+                                yield content
+                            if data.get("done", False):
+                                break
+                        except json.JSONDecodeError:
+                            continue
+        except httpx.TimeoutException as exc:
+            raise HTTPException(status_code=504, detail=f"Ollama request timed out after {self.timeout_seconds}s")
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Failed to stream from Ollama: {exc}")
+
 
 class MockLLMProvider:
     """Deterministic mock provider for offline tests and verification."""
@@ -201,6 +284,14 @@ class MockLLMProvider:
                 usage=None,
             )
         return LLMResult(answer=self.default_response, usage=None)
+
+    async def stream_answer(self, system_prompt: str, user_prompt: str) -> AsyncGenerator[str, None]:
+        res = await self.generate_answer(system_prompt, user_prompt)
+        words = res.answer.split(" ")
+        for i, word in enumerate(words):
+            token = word if i == len(words) - 1 else word + " "
+            yield token
+            await asyncio.sleep(0.01)
 
 
 def get_llm_provider() -> LLMProvider:

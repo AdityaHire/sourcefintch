@@ -37,22 +37,25 @@ const create = async ({
  * natively, so we build the VALUES list manually (still parameterized).
  */
 const createMany = async (filesArray) => {
-  if (filesArray.length === 0) return [];
+  if (!filesArray || filesArray.length === 0) return [];
 
-  const placeholders = filesArray.map(() => '(?, ?, ?, ?, ?)').join(', ');
-  const values = filesArray.flatMap((f) => [
-    f.repositoryId,
-    f.filePath,
-    f.language ?? null,
-    f.fileSize ?? 0,
-    f.content ?? null,
-  ]);
+  const BATCH_SIZE = 500;
+  for (let i = 0; i < filesArray.length; i += BATCH_SIZE) {
+    const chunk = filesArray.slice(i, i + BATCH_SIZE);
+    const placeholders = chunk.map(() => '(?, ?, ?, ?, ?)').join(', ');
+    const values = chunk.flatMap((f) => [
+      f.repositoryId,
+      f.filePath,
+      f.language ?? null,
+      f.fileSize ?? 0,
+      f.content ?? null,
+    ]);
 
-  const sql = `INSERT INTO files (repository_id, file_path, language, file_size, content) VALUES ${placeholders}`;
-  await pool.execute(sql, sqlParams(values));
+    const sql = `INSERT INTO files (repository_id, file_path, language, file_size, content) VALUES ${placeholders}`;
+    await pool.execute(sql, sqlParams(values));
+  }
 
-  // Return all files for the repo (simpler than fetching by range of insertIds)
-  return findByRepositoryId(filesArray[0].repositoryId);
+  return filesArray;
 };
 
 // ── READ ────────────────────────────────────────────────────────────────────

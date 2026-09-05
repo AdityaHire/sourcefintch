@@ -16,7 +16,11 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 const config = {
   port: parseInt(process.env.PORT, 10) || 3001,
   nodeEnv: process.env.NODE_ENV || 'development',
-  corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  corsOrigin: process.env.CORS_ORIGIN
+    ? (process.env.CORS_ORIGIN.includes(',')
+        ? process.env.CORS_ORIGIN.split(',').map((s) => s.trim())
+        : process.env.CORS_ORIGIN)
+    : 'http://localhost:5173',
 
   // ── MySQL ──────────────────────────────────────────
   mysql: {

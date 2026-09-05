@@ -235,3 +235,46 @@ def search_points(
         }
         for point in points
     ]
+
+
+def scroll_repository_chunks(
+    collection_name: str,
+    repository_id: int,
+    limit: int = 1000,
+) -> list[dict[str, Any]]:
+    """Fetch all chunk payloads for a repository without fetching vectors.
+
+    Used by the hybrid BM25 search index.
+    """
+    client = get_qdrant_client()
+    if not client.collection_exists(collection_name):
+        return []
+
+    filter_condition = models.Filter(
+        must=[
+            models.FieldCondition(
+                key="repository_id",
+                match=models.MatchValue(value=repository_id),
+            )
+        ]
+    )
+
+    try:
+        points, _ = client.scroll(
+            collection_name=collection_name,
+            scroll_filter=filter_condition,
+            limit=limit,
+            with_payload=True,
+            with_vectors=False,
+        )
+        return [
+            {
+                "id": point.id,
+                "payload": point.payload or {},
+            }
+            for point in points
+        ]
+    except Exception as exc:
+        logger.warning("Failed to scroll chunks for repo %d: %s", repository_id, exc)
+        return []
+

@@ -1,0 +1,12 @@
+{
+  "name": "sourcefinch-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sourcefinch — AI-powered codebase intelligence platform",
+  "scripts": {
+    "build": "npm --prefix frontend run build",
+    "install:frontend": "npm --prefix frontend install",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend run dev"
+  }
+}

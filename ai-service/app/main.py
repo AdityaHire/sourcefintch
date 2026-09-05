@@ -89,9 +89,10 @@ app = FastAPI(
 
 # ── CORS ────────────────────────────────────────────
 # Allow the frontend (and Node backend) to call this service
+_cors_origins = [o.strip() for o in settings.cors_origin.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.cors_origin],
+    allow_origins=_cors_origins if _cors_origins else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

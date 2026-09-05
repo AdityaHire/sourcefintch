@@ -14,6 +14,7 @@ const { Router } = require('express');
 const requireAuth = require('../middleware/requireAuth');
 const requireInternalSecret = require('../middleware/requireInternalSecret');
 const requireAuthOrInternal = require('../middleware/requireAuthOrInternal');
+const { ingestionRateLimiter } = require('../middleware/rateLimiter');
 const {
   listCompletedRepositories,
   createRepository,
@@ -29,8 +30,8 @@ const router = Router();
 // GET /api/repositories — list completed repositories for the signed-in user
 router.get('/', requireAuth, listCompletedRepositories);
 
-// POST /api/repositories — start ingestion
-router.post('/', requireAuth, createRepository);
+// POST /api/repositories — start ingestion (rate limited)
+router.post('/', requireAuth, ingestionRateLimiter, createRepository);
 
 // GET /api/repositories/:id — frontend status polling AND AI service lookup
 router.get('/:id', requireAuthOrInternal, getRepository);

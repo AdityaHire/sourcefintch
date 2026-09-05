@@ -69,6 +69,24 @@ const findActiveByUserId = async (userId) => {
   return rows;
 };
 
+// Repos that have been "active" longer than this many minutes are considered
+// stuck (worker died, AI service crashed, network blip, etc.) and will be
+// auto-failed so the user can retry.  Default: 30 minutes.
+const STUCK_THRESHOLD_MINUTES = Number(
+  process.env.INGESTION_STUCK_MINUTES || 30
+);
+
+const expireStuckRepositories = async () => {
+  const sql = `
+    UPDATE repositories
+    SET status = 'failed'
+    WHERE status IN ('pending', 'cloning', 'scanning', 'storing', 'embedding')
+      AND updated_at < (NOW() - INTERVAL ? MINUTE)
+  `;
+  const [result] = await pool.execute(sql, [STUCK_THRESHOLD_MINUTES]);
+  return result.affectedRows;
+};
+
 // ── UPDATE ──────────────────────────────────────────────────────────────────
 
 const update = async (id, fields) => {
@@ -93,4 +111,4 @@ const remove = async (id) => {
   return result.affectedRows > 0;
 };
 
-module.exports = { create, findById, findByUserId, findCompleted, findCompletedByUserId, findActiveByUserId, update, remove };
+module.exports = { create, findById, findByUserId, findCompleted, findCompletedByUserId, findActiveByUserId, expireStuckRepositories, update, remove };

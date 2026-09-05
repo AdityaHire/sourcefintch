@@ -30,12 +30,12 @@ from app.parsers.python_parser import PythonParser
 
 logger = logging.getLogger(__name__)
 
-# Maps language identifiers (from MySQL's files.language column) to parser
-# classes.  "tsx" is deliberately absent — see module docstring above.
+# Maps language identifiers (from MySQL's files.language column) to parser classes.
 PARSER_MAP: dict[str, type[BaseParser]] = {
     "python": PythonParser,
     "javascript": JavaScriptParser,
     "typescript": JavaScriptParser,
+    "tsx": JavaScriptParser,
 }
 
 # Shared instances — parsers are stateless, so we can reuse them.

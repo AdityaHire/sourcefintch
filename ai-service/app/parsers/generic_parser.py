@@ -37,8 +37,9 @@ BOUNDARY_PATTERN = re.compile(
     re.MULTILINE,
 )
 
-CHUNK_SIZE = 40    # Lines per chunk when no boundaries are found
-OVERLAP = 5        # Lines of overlap between consecutive fixed-size chunks
+CHUNK_SIZE = 60    # Lines per chunk when no boundaries are found
+OVERLAP = 10       # Lines of overlap between consecutive fixed-size chunks
+MAX_CHUNKS_PER_FILE = 20  # Cap to prevent giant non-code files from exploding vector DB
 
 
 class GenericParser(BaseParser):
@@ -58,10 +59,12 @@ class GenericParser(BaseParser):
         boundary_indices = self._find_boundaries(lines)
 
         if boundary_indices:
-            return self._chunk_by_boundaries(file_path, language, lines, boundary_indices)
+            chunks = self._chunk_by_boundaries(file_path, language, lines, boundary_indices)
+        else:
+            # No boundaries found — fall back to fixed-line chunking
+            chunks = self._chunk_fixed_lines(file_path, language, lines)
 
-        # No boundaries found — fall back to fixed-line chunking
-        return self._chunk_fixed_lines(file_path, language, lines)
+        return chunks[:MAX_CHUNKS_PER_FILE]
 
     def _find_boundaries(self, lines: list[str]) -> list[int]:
         """Find 0-indexed line numbers where function/class definitions start."""

@@ -44,13 +44,37 @@ const createRepository = async (req, res, next) => {
 
     const repoInfo = await validateRepo(owner, repo);
 
+    // Auto-fail any repos that have been "in progress" longer than the
+    // configured threshold.  This handles cases where the AI service
+    // crashed or the network blipped, leaving a repo stuck in a non-terminal
+    // state forever.
+    try {
+      const expired = await Repository.expireStuckRepositories();
+      if (expired > 0) {
+        console.log(`[repositories] Auto-failed ${expired} stuck ingestion(s).`);
+      }
+    } catch (e) {
+      console.warn('[repositories] expireStuckRepositories failed:', e.message);
+    }
+
     const activeRepos = await Repository.findActiveByUserId(currentUserId);
     if (activeRepos.length > 0) {
-      const err = new Error(
-        'You already have a repository in progress. Please wait for it to complete.'
-      );
-      err.statusCode = 429;
-      throw err;
+      // A 'pending' row that never moved to 'cloning' usually means the
+      // worker never picked it up (process died during deploy/restart).
+      // Delete it and proceed so the user isn't stuck.
+      const orphan = activeRepos.find((r) => r.status === 'pending');
+      if (orphan) {
+        console.log(
+          `[repositories] Removing orphan pending repo ${orphan.id} (never picked up)`
+        );
+        await Repository.remove(orphan.id);
+      } else {
+        const err = new Error(
+          'You already have a repository in progress. Please wait for it to complete.'
+        );
+        err.statusCode = 429;
+        throw err;
+      }
     }
 
     const repository = await Repository.create({

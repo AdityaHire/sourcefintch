@@ -17,14 +17,14 @@ LLM call, so it is never forwarded to retrieval or generation.
 
 import logging
 from enum import Enum
-from typing import Optional
+from typing import AsyncGenerator, Optional
 
 import httpx
 from fastapi import HTTPException
 
 from app.config import settings
 from app.services.llm_service import get_llm_provider
-from app.services.rag_service import answer_question, get_repository_info
+from app.services.rag_service import answer_question, get_repository_info, stream_question
 
 logger = logging.getLogger(__name__)
 
@@ -313,3 +313,61 @@ async def route_message(
 
     # Safety fallback: anything unrecognized is treated as a code question.
     return await handle_code_query(repository_id, message)
+
+
+async def route_message_stream(
+    repository_id: int,
+    message: str,
+    conversation_history: Optional[list] = None,
+) -> AsyncGenerator[dict, None]:
+    """Classify incoming message and stream back tokens and citations."""
+    if is_empty_or_malformed(message):
+        yield {"type": "citations", "sources": []}
+        yield {"type": "token", "content": handle_empty()["answer"]}
+        yield {"type": "done"}
+        return
+
+    category = await classify_message(message, conversation_history)
+    logger.info("Routed message stream for repo %d → category=%s", repository_id, category.value)
+
+    if category == MessageCategory.CONVERSATIONAL:
+        yield {"type": "citations", "sources": []}
+        llm = get_llm_provider()
+        try:
+            async for token in llm.stream_answer(system_prompt=ASSISTANT_IDENTITY_PROMPT, user_prompt=message):
+                yield {"type": "token", "content": token}
+        except Exception as exc:
+            logger.error("Error streaming conversational answer: %s", exc)
+            yield {"type": "error", "content": str(exc)}
+            return
+        yield {"type": "done"}
+        return
+
+    if category == MessageCategory.CODE_QUERY:
+        async for event in stream_question(repository_id, message, conversation_history):
+            yield event
+        return
+
+    if category == MessageCategory.OFF_TOPIC:
+        yield {"type": "citations", "sources": []}
+        yield {"type": "token", "content": OFF_TOPIC_REDIRECT}
+        yield {"type": "done"}
+        return
+
+    if category == MessageCategory.AMBIGUOUS:
+        repo_name = await _safe_repo_name(repository_id)
+        yield {"type": "citations", "sources": []}
+        yield {"type": "token", "content": AMBIGUOUS_CLARIFY.format(repo=repo_name)}
+        yield {"type": "done"}
+        return
+
+    if category == MessageCategory.META_COMMAND:
+        yield {"type": "citations", "sources": []}
+        yield {"type": "token", "content": handle_meta_command(message)["answer"]}
+        yield {"type": "done"}
+        return
+
+    # Fallback to code query stream
+    async for event in stream_question(repository_id, message, conversation_history):
+        yield event
+

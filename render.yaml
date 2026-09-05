@@ -1,4 +1,5 @@
 services:
+  # ── Python AI Service (FastAPI + Embeddings + RAG) ────────────
   - type: web
     name: sourcefinch-ai-service
     runtime: python
@@ -36,4 +37,45 @@ services:
       - key: NODE_API_URL
         sync: false
       - key: INTERNAL_API_SECRET
+        sync: false
+
+  # ── Node.js Express Backend (API + Auth + Ingestion) ──────────
+  - type: web
+    name: sourcefinch-backend
+    runtime: node
+    plan: starter
+    rootDir: backend
+    buildCommand: "npm install"
+    startCommand: "npm start"
+    autoDeploy: true
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CORS_ORIGIN
+        sync: false
+      - key: MYSQL_HOST
+        sync: false
+      - key: MYSQL_PORT
+        value: "24225"
+      - key: MYSQL_USER
+        sync: false
+      - key: MYSQL_PASSWORD
+        sync: false
+      - key: MYSQL_DATABASE
+        sync: false
+      - key: MYSQL_SSL
+        value: "true"
+      - key: CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: AI_SERVICE_URL
+        fromService:
+          type: web
+          name: sourcefinch-ai-service
+          property: host
+      - key: INTERNAL_API_SECRET
+        sync: false
+      - key: GITHUB_TOKEN
         sync: false

@@ -22,18 +22,61 @@ const Repository = require('../models/Repository');
 
 const IGNORED_DIRS = new Set([
   '.git',
+  '.svn',
+  '.hg',
   'node_modules',
+  'vendor',
   'venv',
+  '.venv',
+  'env',
+  '.env',
   '__pycache__',
   'dist',
   'build',
+  'out',
+  'target',
+  'bin',
+  'obj',
   'coverage',
+  '.next',
+  '.nuxt',
+  '.turbo',
+  '.yarn',
+  '.cache',
+  '.gradle',
+  '.idea',
+  '.vscode',
+  'pods',
+  'DerivedData',
+  '.terraform',
+  '.docusaurus',
+  'tmp',
+  'temp',
+]);
+
+const IGNORED_FILE_NAMES = new Set([
+  'package-lock.json',
+  'pnpm-lock.yaml',
+  'yarn.lock',
+  'cargo.lock',
+  'gemfile.lock',
+  'poetry.lock',
+  'composer.lock',
+  'bun.lockb',
+  'flake.lock',
 ]);
 
 const IGNORED_FILE_PATTERNS = [
   /^\.env(\.|$)/i,
   /\.lock$/i,
   /\.log$/i,
+  /\.min\.(js|css)$/i,
+  /\.bundle\.(js|css)$/i,
+  /\.chunk\.(js|css)$/i,
+  /\.map$/i,
+  /\.d\.ts\.map$/i,
+  /\.wasm$/i,
+  /\.snap$/i,
 ];
 
 const BINARY_EXTENSIONS = new Set([
@@ -42,8 +85,10 @@ const BINARY_EXTENSIONS = new Set([
   '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
   '.zip', '.tar', '.gz', '.rar', '.7z', '.bz2',
   '.exe', '.dll', '.so', '.dylib', '.bin', '.dat',
-  '.pyc', '.class', '.o',
+  '.pyc', '.class', '.o', '.map', '.wasm', '.ttf', '.woff', '.woff2', '.eot', '.cur', '.psd',
 ]);
+
+const MAX_INGESTION_FILE_BYTES = 250 * 1024; // 250 KB max per file (skips massive bundles/dumps)
 
 const LANGUAGE_MAP = {
   '.js': 'javascript',
@@ -96,6 +141,8 @@ const LANGUAGE_MAP = {
 };
 
 const shouldIgnoreFile = (fileName) => {
+  const lower = fileName.toLowerCase();
+  if (IGNORED_FILE_NAMES.has(lower)) return true;
   for (const pattern of IGNORED_FILE_PATTERNS) {
     if (pattern.test(fileName)) return true;
   }
@@ -157,7 +204,11 @@ const processFiles = async (repositoryId, cloneDir) => {
           continue;
         }
 
-        if (stats.size > config.ingestion.maxFileSizeBytes) {
+        const maxBytes = Math.min(
+          config.ingestion.maxFileSizeBytes || MAX_INGESTION_FILE_BYTES,
+          MAX_INGESTION_FILE_BYTES
+        );
+        if (stats.size > maxBytes || stats.size === 0) {
           continue;
         }
 

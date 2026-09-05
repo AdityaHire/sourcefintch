@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { marked, type Token, type Tokens } from 'marked';
-import { Copy, Check, Code2 } from 'lucide-react';
+import { Copy, Check, FileCode } from 'lucide-react';
 
 interface MarkdownRendererProps {
   content: string;
@@ -83,15 +83,17 @@ function renderInlineTokens(
         const match = t.text.match(/^([\w./\-]+):(\d+)(?:[–-](\d+))?$/);
         if (match && onOpenCode) {
           const [, filePath, start, end] = match;
+          const startNum = parseInt(start, 10);
+          const endNum = end ? parseInt(end, 10) : startNum;
           return (
             <button
               key={idx}
               type="button"
-              onClick={() => onOpenCode(filePath, parseInt(start, 10), end ? parseInt(end, 10) : parseInt(start, 10))}
-              className="inline-flex items-center gap-1 font-code text-[11.5px] text-zinc-800 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 px-2 py-0.5 rounded-md border border-zinc-200 dark:border-zinc-700 mx-0.5 font-medium cursor-pointer transition-colors"
-              title={`Inspect ${t.text}`}
+              onClick={() => onOpenCode(filePath, startNum, endNum)}
+              className="inline-flex items-center gap-1.5 font-code text-[11.5px] text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 px-2 py-0.5 rounded-md border border-indigo-200/80 dark:border-indigo-800/60 mx-0.5 font-medium cursor-pointer transition-colors shadow-2xs group"
+              title={`Inspect ${filePath}:${startNum}–${endNum} in CodeViewer`}
             >
-              <Code2 className="w-3 h-3 text-zinc-500 dark:text-zinc-400" />
+              <FileCode className="w-3 h-3 text-indigo-500 dark:text-indigo-400 group-hover:scale-110 transition-transform" />
               <span>{t.text}</span>
             </button>
           );
@@ -136,6 +138,37 @@ function renderInlineTokens(
         if (t.tokens && t.tokens.length > 0) {
           return <React.Fragment key={idx}>{renderInlineTokens(t.tokens, onOpenCode)}</React.Fragment>;
         }
+
+        // Detect inline citations formatted as path/to/file.ext:10-25 or path:10
+        if (onOpenCode && /([\w\-./]+\.[a-zA-Z0-9]+):(\d+)(?:[–-](\d+))?/.test(t.text)) {
+          const parts = t.text.split(/((?:[\w\-./]+\.[a-zA-Z0-9]+):(?:\d+)(?:[–-](?:\d+))?)/g);
+          return (
+            <React.Fragment key={idx}>
+              {parts.map((part, pIdx) => {
+                const match = part.match(/^([\w\-./]+\.[a-zA-Z0-9]+):(\d+)(?:[–-](\d+))?$/);
+                if (match) {
+                  const [, filePath, start, end] = match;
+                  const startNum = parseInt(start, 10);
+                  const endNum = end ? parseInt(end, 10) : startNum;
+                  return (
+                    <button
+                      key={pIdx}
+                      type="button"
+                      onClick={() => onOpenCode(filePath, startNum, endNum)}
+                      className="inline-flex items-center gap-1.5 font-code text-[11.5px] text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 px-2 py-0.5 rounded-md border border-indigo-200/80 dark:border-indigo-800/60 mx-0.5 font-medium cursor-pointer transition-colors shadow-2xs group"
+                      title={`Inspect ${filePath}:${startNum}–${endNum} in CodeViewer`}
+                    >
+                      <FileCode className="w-3 h-3 text-indigo-500 dark:text-indigo-400 group-hover:scale-110 transition-transform" />
+                      <span>{part}</span>
+                    </button>
+                  );
+                }
+                return part;
+              })}
+            </React.Fragment>
+          );
+        }
+
         return <React.Fragment key={idx}>{t.text}</React.Fragment>;
       }
     }

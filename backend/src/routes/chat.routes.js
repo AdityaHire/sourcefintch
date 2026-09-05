@@ -4,10 +4,12 @@
 
 const { Router } = require('express');
 const requireAuth = require('../middleware/requireAuth');
-const { handleChat } = require('../controllers/chat.controller');
+const { chatRateLimiter } = require('../middleware/rateLimiter');
+const { handleChat, handleChatStream } = require('../controllers/chat.controller');
 
 const router = Router();
 
-router.post('/', requireAuth, handleChat);
+router.post('/', requireAuth, chatRateLimiter, handleChat);
+router.post('/stream', requireAuth, chatRateLimiter, handleChatStream);
 
 module.exports = router;

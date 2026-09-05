@@ -72,7 +72,6 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
   const [repoFiles, setRepoFiles] = useState<RepositoryFile[]>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
   const [selectedFile, setSelectedFile] = useState<RepositoryFile | null>(null);
-  const [latestAnimatedMsgId, setLatestAnimatedMsgId] = useState<number | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<PromptInputBoxHandle>(null);
@@ -251,46 +250,75 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
       content: userText,
       created_at: new Date().toISOString(),
     };
-    setMessages((prev) => [...prev, optimisticUserMsg]);
+    const assistantMsgId = Date.now() + 1;
+    const optimisticAssistantMsg: ChatMessage = {
+      id: assistantMsgId,
+      role: 'assistant',
+      content: '',
+      sources: [],
+      created_at: new Date().toISOString(),
+    };
+
+    setMessages((prev) => [...prev, optimisticUserMsg, optimisticAssistantMsg]);
     setIsSubmitting(true);
 
     try {
-      const response = await api.sendChatMessage({
-        conversation_id: conversationId || undefined,
-        repository_id: selectedRepoId,
-        message: userText,
-        new_conversation: !conversationId,
-      });
-
-      if (!conversationId && response.conversation_id) {
-        setConversationId(response.conversation_id);
-        const url = new URL(window.location.href);
-        url.searchParams.set('conversationId', String(response.conversation_id));
-        window.history.pushState(null, '', url.pathname + url.search);
-      }
-
-      if (response.persistence_warning) {
-        setPersistenceWarning(true);
-      } else {
-        setPersistenceWarning(false);
-      }
-
-      const assistantMsg: ChatMessage = {
-        id: response.message.id,
-        role: 'assistant',
-        content: response.message.content,
-        sources: response.message.sources,
-        created_at: new Date().toISOString(),
-      };
-      setLatestAnimatedMsgId(response.message.id ?? null);
-      setMessages((prev) => [...prev, assistantMsg]);
-
-      // Cache latest citation for Show Code inspection
-      if (response.message.sources && response.message.sources.length > 0) {
-        setSelectedCitation(response.message.sources[0]);
-      }
+      await api.streamChatMessage(
+        {
+          conversation_id: conversationId || undefined,
+          repository_id: selectedRepoId,
+          message: userText,
+          new_conversation: !conversationId,
+        },
+        {
+          onConversation: (convId) => {
+            if (!conversationId) {
+              setConversationId(convId);
+              const url = new URL(window.location.href);
+              url.searchParams.set('conversationId', String(convId));
+              window.history.pushState(null, '', url.pathname + url.search);
+            }
+          },
+          onCitations: (sources) => {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMsgId ? { ...msg, sources } : msg
+              )
+            );
+            if (sources && sources.length > 0) {
+              setSelectedCitation(sources[0]);
+            }
+          },
+          onToken: (token) => {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMsgId
+                  ? { ...msg, content: (msg.content || '') + token }
+                  : msg
+              )
+            );
+          },
+          onSaved: (savedId) => {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMsgId ? { ...msg, id: savedId } : msg
+              )
+            );
+          },
+          onError: (err) => {
+            setErrorMessage(err);
+          },
+        }
+      );
     } catch (err: any) {
       setErrorMessage(err.message || 'An error occurred while answering your question.');
+      setMessages((prev) =>
+        prev.filter(
+          (msg) =>
+            msg.id !== assistantMsgId ||
+            (Boolean(msg.content) && msg.content.trim().length > 0)
+        )
+      );
     } finally {
       setIsSubmitting(false);
       composerRef.current?.focus();
@@ -302,13 +330,16 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
     setIsCodeViewerOpen(true);
   };
 
-  // Direct code opener for markdown tokens
+  // Direct code opener for markdown tokens and interactive citations
   const handleOpenCode = (filePath: string, startLine?: number, endLine?: number) => {
-    // Check if matching citation exists in messages
+    const sLine = startLine || 1;
+    const eLine = endLine || sLine;
+
+    // 1. Check if matching citation exists in recent message sources
     let foundCitation: SourceCitation | null = null;
     for (let i = messages.length - 1; i >= 0; i--) {
       const s = messages[i].sources?.find(
-        (src) => src.file_path.includes(filePath) || filePath.includes(src.file_path)
+        (src) => src.file_path.endsWith(filePath) || filePath.endsWith(src.file_path)
       );
       if (s) {
         foundCitation = s;
@@ -319,12 +350,26 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
     if (foundCitation) {
       setSelectedCitation(foundCitation);
     } else {
+      // 2. Check if file is loaded in repoFiles to display real code lines
+      const cleanPath = filePath.replace(/^\/+/, '');
+      const matchFile = repoFiles.find(
+        (f) => f.file_path === cleanPath || f.file_path.endsWith(cleanPath) || cleanPath.endsWith(f.file_path)
+      );
+
+      let content = `// Source code snippet for ${filePath}:${sLine}-${eLine}`;
+      if (matchFile?.content) {
+        const fileLines = matchFile.content.split('\n');
+        const startIdx = Math.max(0, sLine - 1);
+        const endIdx = Math.min(fileLines.length, eLine);
+        content = fileLines.slice(startIdx, endIdx).join('\n') || matchFile.content;
+      }
+
       setSelectedCitation({
-        file_path: filePath,
-        start_line: startLine || 1,
-        end_line: endLine || startLine || 1,
-        content: `// Source code snippet for ${filePath}:${startLine || 1}-${endLine || startLine || 1}`,
-        score: 0.95,
+        file_path: matchFile ? matchFile.file_path : filePath,
+        start_line: sLine,
+        end_line: eLine,
+        content: content,
+        score: 1.0,
       });
     }
     setIsCodeViewerOpen(true);
@@ -538,9 +583,17 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
                           <MarkdownRenderer
                             content={msg.content}
                             onOpenCode={handleOpenCode}
-                            animate={!isUser && msg.id === latestAnimatedMsgId}
+                            animate={false}
                             onTypingComplete={scrollToBottom}
                           />
+                        ) : isSubmitting && index === messages.length - 1 ? (
+                          <div className="flex items-center gap-2.5 py-2 px-1 text-xs text-zinc-500 dark:text-zinc-400 font-sans-ui">
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                            </span>
+                            <span>Searching codebase & reasoning...</span>
+                          </div>
                         ) : (
                           <div className="max-w-[72ch] rounded-xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/[0.06] px-4 py-3 text-xs text-amber-900 dark:text-amber-200 font-sans-ui">
                             No answer was generated for this question. The LLM returned an empty response — this can happen with very short queries or if the model truncated its output. Try rephrasing your question.

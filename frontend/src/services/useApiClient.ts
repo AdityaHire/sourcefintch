@@ -57,6 +57,11 @@ export function useApiClient() {
       deleteRepository: (id: number) => api.deleteRepository(authedFetch, id),
       sendChatMessage: (payload: Parameters<typeof api.sendChatMessage>[1]) =>
         api.sendChatMessage(authedFetch, payload),
+      streamChatMessage: (
+        payload: Parameters<typeof api.streamChatMessage>[1],
+        callbacks: Parameters<typeof api.streamChatMessage>[2],
+        signal?: AbortSignal
+      ) => api.streamChatMessage(authedFetch, payload, callbacks, signal),
     }),
     [isLoaded, isSignedIn, authedFetch]
   );

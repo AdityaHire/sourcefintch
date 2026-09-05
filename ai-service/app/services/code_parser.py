@@ -260,6 +260,13 @@ async def parse_repository(
         for file_info in file_list:
             file_path = file_info.get("file_path", "")
             language = file_info.get("language") or "unknown"
+            file_size = file_info.get("file_size", 0)
+
+            # Skip files larger than 250KB or empty files
+            if file_size > 250 * 1024 or file_size == 0:
+                files_skipped += 1
+                continue
+
             full_path = os.path.join(clone_dir, file_path)
 
             # Read file content with encoding safety
@@ -288,6 +295,17 @@ async def parse_repository(
                     chunk.parser_used,
                     len(chunk.content),
                 )
+
+        # Cap total chunks per repository to keep indexing fast and prevent OOM
+        MAX_CHUNKS_PER_REPOSITORY = 400
+        if len(all_chunks) > MAX_CHUNKS_PER_REPOSITORY:
+            logger.info(
+                "Repository %d produced %d chunks; capping at %d for fast indexing",
+                repository_id,
+                len(all_chunks),
+                MAX_CHUNKS_PER_REPOSITORY,
+            )
+            all_chunks = all_chunks[:MAX_CHUNKS_PER_REPOSITORY]
 
         logger.info(
             "Parsed repository %d: %d files parsed, %d skipped, %d chunks",
@@ -320,7 +338,7 @@ async def parse_repository(
 
         # ── 8. Batch embedding generation ────────────────────────────
         chunk_texts = [c.content for c in all_chunks]
-        vectors = embed_texts(chunk_texts, batch_size=32)
+        vectors = embed_texts(chunk_texts, batch_size=64)
 
         # ── 9. Generate UUID point IDs and bulk insert into MySQL ────
         qdrant_point_ids = [str(uuid.uuid4()) for _ in all_chunks]

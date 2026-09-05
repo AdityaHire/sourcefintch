@@ -30,9 +30,10 @@ from app.parsers.base_parser import BaseParser, Chunk
 
 JS_LANGUAGE = Language(tsjavascript.language())
 TS_LANGUAGE = Language(tstypescript.language_typescript())
+TSX_LANGUAGE = Language(tstypescript.language_tsx())
 
 # Node types to extract as individual chunks.  These cover the most
-# common top-level and class-level constructs in JS/TS.
+# common top-level and class-level constructs in JS/TS/TSX.
 TARGET_NODE_TYPES = {
     "function_declaration",
     "class_declaration",
@@ -43,22 +44,28 @@ TARGET_NODE_TYPES = {
 
 
 class JavaScriptParser(BaseParser):
-    """Tree-sitter parser for JavaScript and TypeScript source files."""
+    """Tree-sitter parser for JavaScript, TypeScript, and TSX source files."""
 
     def __init__(self):
         self._js_parser = Parser(JS_LANGUAGE)
         self._ts_parser = Parser(TS_LANGUAGE)
+        self._tsx_parser = Parser(TSX_LANGUAGE)
 
     def parse(self, file_path: str, language: str, content: str) -> list[Chunk]:
-        """Parse JS or TS source into chunks using tree-sitter.
+        """Parse JS, TS, or TSX source into chunks using tree-sitter.
 
-        The ``language`` parameter must be "javascript" or "typescript".
+        The ``language`` parameter can be "javascript", "typescript", or "tsx".
         Line numbers in returned Chunks are 1-indexed.
         """
         if not content or not content.strip():
             return []
 
-        parser = self._ts_parser if language == "typescript" else self._js_parser
+        if language == "tsx":
+            parser = self._tsx_parser
+        elif language == "typescript":
+            parser = self._ts_parser
+        else:
+            parser = self._js_parser
         tree = parser.parse(content.encode("utf-8"))
         chunks = []
         lines = content.splitlines(keepends=True)

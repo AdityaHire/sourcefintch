@@ -18,7 +18,7 @@ Coordinates:
 import asyncio
 import json
 import logging
-from typing import Optional
+from typing import AsyncGenerator, Optional
 
 import tiktoken
 from fastapi import HTTPException
@@ -503,3 +503,95 @@ async def answer_question(repository_id: int, question: str, conversation_histor
         "answer": answer_text,
         "sources": sources,
     }
+
+
+async def stream_question(
+    repository_id: int,
+    question: str,
+    conversation_history: Optional[list] = None,
+) -> AsyncGenerator[dict, None]:
+    """Execute the RAG pipeline and stream the answer token by token.
+
+    Yields:
+        {"type": "citations", "sources": [...]}
+        {"type": "token", "content": "..."}
+        {"type": "done"}
+    """
+    # Step 1: Verify repository status
+    repo_info = await get_repository_info(repository_id)
+    status = repo_info.get("status", "").lower()
+
+    if status in ("pending", "cloning", "scanning", "storing", "embedding"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Repository {repository_id} is currently indexing (status: '{status}'). Please wait for indexing to complete.",
+        )
+    if status == "failed":
+        raise HTTPException(
+            status_code=422,
+            detail=f"Repository {repository_id} indexing failed and cannot be queried.",
+        )
+
+    # Step 2: Rewrite query
+    retrieval_query = await rewrite_query(question, conversation_history)
+
+    # Step 3: Retrieve relevant chunks
+    candidate_chunks = retrieve_relevant_chunks(
+        repository_id=repository_id,
+        query=retrieval_query,
+        top_k=settings.rag_top_k,
+        min_score=settings.rag_min_score,
+    )
+
+    # Step 4: Zero-evidence short-circuit
+    if not candidate_chunks:
+        yield {"type": "citations", "sources": []}
+        yield {"type": "token", "content": FALLBACK_NO_EVIDENCE}
+        yield {"type": "done"}
+        return
+
+    # Step 5: Apply context-size cap
+    retained_chunks, dropped_count = apply_context_cap(
+        candidate_chunks,
+        max_chars=settings.rag_max_context_chars,
+    )
+
+    # Step 6: Pre-flight trimming
+    estimated_tokens = estimate_full_prompt_tokens(
+        SYSTEM_PROMPT, question, retained_chunks, conversation_history,
+    )
+    while estimated_tokens > settings.rag_max_estimated_tokens and len(retained_chunks) > 1:
+        new_len = max(1, len(retained_chunks) // 2)
+        retained_chunks = retained_chunks[:new_len]
+        estimated_tokens = estimate_full_prompt_tokens(
+            SYSTEM_PROMPT, question, retained_chunks, conversation_history,
+        )
+
+    sources = [
+        {
+            "file_path": c["file_path"],
+            "start_line": c["start_line"],
+            "end_line": c["end_line"],
+            "code_chunk_id": c.get("code_chunk_id"),
+            "score": round(float(c.get("score", 0.0)), 4),
+            "content": c.get("content", ""),
+        }
+        for c in retained_chunks
+    ]
+
+    # First event: citations
+    yield {"type": "citations", "sources": sources}
+
+    # Step 7: Stream tokens
+    user_prompt = build_user_prompt(question, retained_chunks)
+    llm_provider = get_llm_provider()
+    try:
+        async for token in llm_provider.stream_answer(system_prompt=SYSTEM_PROMPT, user_prompt=user_prompt):
+            yield {"type": "token", "content": token}
+    except Exception as exc:
+        logger.error("Error during streaming generation for repo %d: %s", repository_id, exc)
+        yield {"type": "error", "content": str(exc)}
+        return
+
+    yield {"type": "done"}
+

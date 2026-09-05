@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     # Leaves margin so we proactively trim before hitting a 413.
     rag_max_estimated_tokens: int = 7000
 
+    # ── Hybrid Search (BM25 + Dense RRF) ────────────
+    hybrid_search_enabled: bool = True
+    hybrid_rrf_k: int = 60
+    hybrid_dense_weight: float = 1.0
+    hybrid_bm25_weight: float = 1.0
+
     # ── Embeddings ──────────────────────────────────
     embedding_provider: str = "local"
     embedding_model: str = "all-MiniLM-L6-v2"

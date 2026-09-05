@@ -96,7 +96,7 @@ class LocalEmbeddingProvider:
         self._load_model()
         return self._dimension or 384
 
-    def embed(self, texts: list[str], batch_size: int = 32) -> list[list[float]]:
+    def embed(self, texts: list[str], batch_size: int = 64) -> list[list[float]]:
         if not texts:
             return []
         model = self._load_model()
@@ -115,8 +115,8 @@ class LocalEmbeddingProvider:
 class GeminiEmbeddingProvider:
     """Cloud provider using gemini-embedding-001 with MRL dimension truncation.
 
-    Embeds one text per request (Gemini's per-request input model) and retries
-    with exponential backoff on 429 rate-limit errors (free tier).
+    Embeds with concurrent requests and retries with exponential backoff
+    on 429 rate-limit errors (free tier).
     """
 
     def __init__(
@@ -200,7 +200,10 @@ class GeminiEmbeddingProvider:
     def embed(self, texts: list[str]) -> list[list[float]]:
         if not texts:
             return []
-        return [self._embed_one(t) for t in texts]
+        from concurrent.futures import ThreadPoolExecutor
+        max_workers = min(5, len(texts))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            return list(executor.map(self._embed_one, texts))
 
 
 # ── Provider selection + backward-compatible helpers ─────────────────────────
@@ -233,7 +236,7 @@ def get_vector_dimension() -> int:
     return get_embedding_provider().dimension
 
 
-def embed_texts(texts: list[str], batch_size: int = 32) -> list[list[float]]:
+def embed_texts(texts: list[str], batch_size: int = 64) -> list[list[float]]:
     """Generate vector embeddings for a list of text strings (provider-agnostic)."""
     if not texts:
         return []
