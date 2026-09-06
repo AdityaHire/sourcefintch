@@ -206,8 +206,6 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
     setIsFileTreeOpen(false);
     setRepoFiles([]);
     setSelectedFile(null);
-    setReport(null);
-    setIsReportOpen(false);
     setErrorMessage(null);
 
     const url = new URL(window.location.href);
