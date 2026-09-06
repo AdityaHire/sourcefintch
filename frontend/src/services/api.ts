@@ -171,21 +171,6 @@ export async function getFileContent(
   return jsonOrThrow(res, 'Failed to fetch file content');
 }
 
-export async function getRepositoryReport(
-  authedFetch: AuthedFetch,
-  id: number,
-  forceRefresh?: boolean
-): Promise<import('../types').RepositoryReport> {
-  const endpoint = forceRefresh
-    ? apiUrl(`/api/repositories/${id}/report?refresh=true`)
-    : apiUrl(`/api/repositories/${id}/report`);
-  const res = await authedFetch(endpoint, {
-    method: forceRefresh ? 'POST' : 'GET',
-    ...(forceRefresh ? { body: JSON.stringify({ force_refresh: true }) } : {}),
-  });
-  return jsonOrThrow(res, 'Failed to fetch repository intelligence report');
-}
-
 export async function sendChatMessage(
   authedFetch: AuthedFetch,
   payload: {

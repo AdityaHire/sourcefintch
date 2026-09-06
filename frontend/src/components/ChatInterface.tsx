@@ -9,12 +9,10 @@ import { Banner } from './ui/Banner';
 import { Skeleton } from './ui/Skeleton';
 import { StatusDot } from './ui/StatusDot';
 import { useApiClient } from '../services/useApiClient';
-import RepositoryReportModal from './RepositoryReportModal';
 import type {
   Repository,
   ChatMessage,
   SourceCitation,
-  RepositoryReport,
 } from '../types';
 import {
   Plus,
@@ -81,10 +79,6 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
-  const [isReportOpen, setIsReportOpen] = useState(false);
-  const [report, setReport] = useState<RepositoryReport | null>(null);
-  const [isLoadingReport, setIsLoadingReport] = useState(false);
-  const [reportError, setReportError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<PromptInputBoxHandle>(null);
@@ -200,74 +194,6 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
     }
     setIsFileTreeOpen(!isFileTreeOpen);
     if (isCodeViewerOpen) setIsCodeViewerOpen(false);
-  };
-
-  // ── Fetch & Open Repository Intelligence Report ───────────────────────────
-  const fetchRepositoryReport = useCallback(
-    async (repoId: number, forceRefresh = false) => {
-      setIsLoadingReport(true);
-      setReportError(null);
-      try {
-        if (repoFiles.length === 0) {
-          api.getRepositoryFiles(repoId).then((files) => setRepoFiles(files)).catch(() => {});
-        }
-        const data = await api.getRepositoryReport(repoId, forceRefresh);
-        setReport(data);
-      } catch (err: any) {
-        console.error('Failed to load repository report:', err);
-        setReportError(err?.message || 'Report generation error');
-        if (repoFiles.length === 0) {
-          try {
-            const files = await api.getRepositoryFiles(repoId);
-            setRepoFiles(files);
-          } catch {}
-        }
-      } finally {
-        setIsLoadingReport(false);
-      }
-    },
-    [api, repoFiles.length]
-  );
-
-  const handleOpenReport = () => {
-    if (!selectedRepoId) return;
-    setIsReportOpen(true);
-    if (repoFiles.length === 0) {
-      fetchRepoFiles(selectedRepoId);
-    }
-    if (!report || report.repository_id !== selectedRepoId) {
-      fetchRepositoryReport(selectedRepoId);
-    }
-  };
-
-  const handleRefreshReport = () => {
-    if (!selectedRepoId) return;
-    fetchRepositoryReport(selectedRepoId, true);
-  };
-
-  const handleInspectFileFromReport = (filePath: string) => {
-    const cleanPath = filePath.replace(/^\/+/, '');
-    const match = repoFiles.find(
-      (f) => f.file_path === cleanPath || f.file_path.endsWith(cleanPath) || cleanPath.endsWith(f.file_path)
-    );
-
-    if (match) {
-      handleSelectFile(match);
-      setSelectedCitation(null);
-      setIsCodeViewerOpen(true);
-    } else if (selectedRepoId) {
-      api.getRepositoryFiles(selectedRepoId).then((files) => {
-        setRepoFiles(files);
-        const fileMatch = files.find(
-          (f) => f.file_path === cleanPath || f.file_path.endsWith(cleanPath) || cleanPath.endsWith(f.file_path)
-        );
-        if (fileMatch) {
-          handleSelectFile(fileMatch);
-          setSelectedCitation(null);
-          setIsCodeViewerOpen(true);
-        }
-      });
-    }
   };
 
   // ── Switch repository ─────────────────────────────────────────────────────
@@ -719,22 +645,6 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
               )}
             </button>
 
-            {/* Intelligence Report button */}
-            <button
-              type="button"
-              onClick={handleOpenReport}
-              disabled={!selectedRepoId}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer shadow-xs font-sans-ui disabled:opacity-40 disabled:cursor-not-allowed ${
-                isReportOpen
-                  ? 'bg-purple-900/40 text-purple-200 ring-1 ring-purple-500/50'
-                  : 'bg-purple-500/10 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 hover:bg-purple-500/20 dark:hover:bg-purple-500/25 border border-purple-500/30'
-              }`}
-              title="View full repository intelligence report"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-              <span>Report</span>
-            </button>
-
             {/* Primary Action: + New Chat */}
             <button
               type="button"
@@ -1059,27 +969,6 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
         isLoading={isLoadingHistory}
         repoName={activeRepo?.name}
       />
-
-      {/* ── Repository Intelligence Report Modal ──────────────────────── */}
-      {isReportOpen && (
-        <RepositoryReportModal
-          report={report}
-          isLoading={isLoadingReport}
-          errorMessage={reportError}
-          activeRepo={activeRepo}
-          repoFiles={repoFiles}
-          onClose={() => setIsReportOpen(false)}
-          onRefresh={handleRefreshReport}
-          onAskAI={(prompt) => {
-            setIsReportOpen(false);
-            handleSendMessage(prompt);
-          }}
-          onInspectFile={(filePath) => {
-            setIsReportOpen(false);
-            handleInspectFileFromReport(filePath);
-          }}
-        />
-      )}
     </div>
   );
 }

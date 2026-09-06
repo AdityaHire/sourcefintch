@@ -303,8 +303,8 @@ class GeminiProvider:
         model: str = "gemini-2.5-flash",
         timeout_seconds: float = 60.0,
     ):
-        self.api_key = api_key or settings.gemini_api_key
-        self.model = model or settings.report_llm_model
+        self.api_key = api_key or settings.effective_report_gemini_api_key or settings.gemini_api_key
+        self.model = model or settings.effective_report_llm_model or settings.report_llm_model
         self.timeout_seconds = timeout_seconds or settings.report_llm_timeout_seconds
         self._client = None
         self._types = None
@@ -327,10 +327,10 @@ class GeminiProvider:
                 detail="GEMINI_API_KEY is not configured. Please set GEMINI_API_KEY in .env",
             )
 
-        def _sync_call():
+        def _sync_call(model_name: str):
             client = self._get_client()
             response = client.models.generate_content(
-                model=self.model,
+                model=model_name,
                 contents=user_prompt,
                 config=self._types.GenerateContentConfig(
                     system_instruction=system_prompt,
@@ -342,7 +342,24 @@ class GeminiProvider:
 
         try:
             loop = asyncio.get_running_loop()
-            response = await loop.run_in_executor(None, _sync_call)
+            active_model = self.model
+            try:
+                response = await loop.run_in_executor(None, lambda: _sync_call(active_model))
+            except Exception as primary_exc:
+                err_str = str(primary_exc)
+                # If Google API returns 404 (e.g. model retired for new accounts / region),
+                # fall back to Google's recommended available flash model.
+                if ("404" in err_str or "NOT_FOUND" in err_str) and ("gemini-2" in active_model):
+                    fallback_model = "gemini-3.6-flash"
+                    logger.warning(
+                        "Gemini model '%s' returned 404 (%s). Falling back to recommended equivalent '%s'...",
+                        active_model, err_str[:120], fallback_model
+                    )
+                    active_model = fallback_model
+                    response = await loop.run_in_executor(None, lambda: _sync_call(active_model))
+                else:
+                    raise primary_exc
+
             usage = None
             if hasattr(response, "usage_metadata") and response.usage_metadata:
                 usage = {
@@ -352,7 +369,7 @@ class GeminiProvider:
                 }
             logger.info(
                 "Gemini API Response | Model: %s | Prompt Tokens: %s, Completion Tokens: %s",
-                self.model,
+                active_model,
                 usage.get("prompt_tokens") if usage else None,
                 usage.get("completion_tokens") if usage else None,
             )
@@ -401,34 +418,37 @@ def get_llm_provider() -> LLMProvider:
 def get_report_llm_provider() -> LLMProvider:
     """Factory returning the LLM provider specifically for report synthesis."""
     provider_name = settings.report_llm_provider.lower().strip()
+    effective_gemini_key = settings.effective_report_gemini_api_key or settings.gemini_api_key
+    effective_model = settings.effective_report_llm_model or settings.report_llm_model
+
     if provider_name == "gemini":
-        if not settings.gemini_api_key:
+        if not effective_gemini_key:
             logger.warning("GEMINI_API_KEY not configured — falling back to MockLLMProvider for reports.")
             return MockLLMProvider()
         return GeminiProvider(
-            api_key=settings.gemini_api_key,
-            model=settings.report_llm_model,
+            api_key=effective_gemini_key,
+            model=effective_model,
             timeout_seconds=settings.report_llm_timeout_seconds,
         )
     elif provider_name == "groq":
         return GroqProvider(
             api_key=settings.effective_groq_api_key,
-            model=settings.report_llm_model or settings.llm_model,
+            model=effective_model or settings.llm_model,
             timeout_seconds=settings.report_llm_timeout_seconds,
         )
     elif provider_name == "ollama":
         return OllamaProvider(
-            model=settings.report_llm_model or settings.llm_model,
+            model=effective_model or settings.llm_model,
             timeout_seconds=settings.report_llm_timeout_seconds,
         )
     elif provider_name == "mock":
         return MockLLMProvider()
     else:
         logger.warning("Unknown REPORT_LLM_PROVIDER '%s', defaulting to Gemini.", provider_name)
-        if not settings.gemini_api_key:
+        if not effective_gemini_key:
             return MockLLMProvider()
         return GeminiProvider(
-            api_key=settings.gemini_api_key,
-            model=settings.report_llm_model,
+            api_key=effective_gemini_key,
+            model=effective_model,
             timeout_seconds=settings.report_llm_timeout_seconds,
         )

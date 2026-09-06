@@ -66,22 +66,8 @@ const generalRateLimiter = rateLimit({
   handler: customHandler('Too many requests. Please slow down.'),
 });
 
-/**
- * Report Rate Limiter: Max 5 requests per 10 minutes per user/IP.
- */
-const reportRateLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000,
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator,
-  validate: { keyGeneratorIpFallback: false },
-  handler: customHandler('Too many report requests. Please wait a few minutes before generating another report.'),
-});
-
 module.exports = {
   chatRateLimiter,
   ingestionRateLimiter,
   generalRateLimiter,
-  reportRateLimiter,
 };

@@ -108,6 +108,7 @@ module.exports = {
   createMany,
   findById,
   findByRepositoryId,
+  findByRepositoryIdWithContent,
   findByRepoAndPath,
   updateContent,
   remove,

@@ -66,11 +66,6 @@ class Settings(BaseSettings):
     # ── Clone settings ──────────────────────────────
     clone_timeout_seconds: int = 120
 
-    # ── Report LLM ──────────────────────────────────
-    report_llm_provider: str = "gemini"
-    report_llm_model: str = "gemini-2.5-flash"
-    report_llm_timeout_seconds: float = 60.0
-
     @property
     def effective_groq_api_key(self) -> str:
         """Return the configured Groq API key from groq_api_key or llm_api_key."""
