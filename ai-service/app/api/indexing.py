@@ -37,7 +37,8 @@ async def count_repository_chunks(repository_id: int):
     Used by the frontend/tests to tell whether the AI parse has finished
     (count > 0 means chunks are queryable).
     """
-    collection_name = settings.qdrant_collection_name
+    from app.services.embedding_service import get_active_collection_name
+    collection_name = get_active_collection_name()
     try:
         count = count_points(collection_name, repository_id=repository_id)
     except Exception as exc:
