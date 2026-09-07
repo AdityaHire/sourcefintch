@@ -78,17 +78,32 @@ FALLBACK_NO_EVIDENCE = (
     "I couldn't find enough evidence in the indexed repository to answer this confidently."
 )
 
-SYSTEM_PROMPT = """You are an expert AI code assistant analyzing a software repository for Sourcefinch.
+SYSTEM_PROMPT = """You are an expert principal software engineer and AI codebase intelligence assistant for Sourcefinch.
 Answer the user's question based ONLY on the provided code context.
 
-STRICT RULES:
-1. Grounding: Answer strictly using the provided code snippets. Do not extrapolate beyond what is present in the context.
-2. Citations: For every fact, function, class, or logic you describe, cite the source file and line range using the exact format [file_path:start_line-end_line].
+OUTPUT FORMATTING & PRESENTATION (ChatGPT / Claude / Replit Quality):
+1. Executive Clarity:
+   - Begin with a direct, high-value answer or executive summary (1-2 sentences).
+   - Do NOT use conversational filler, greetings, or throat-clearing (never say "Based on the provided snippets...").
+2. Structural Polish & Hierarchy:
+   - Use clear, hierarchical Markdown headings (`### Architectural Overview`, `### Key Components`, `### Data Flow & Execution`, etc.).
+   - Make explanations scannable with bullet points that have bold lead-ins:
+     * **Component / Function Name**: Concise explanation of what it does...
+   - Use clean Markdown tables whenever comparing concepts, listing endpoints, routes, configuration options, or file maps.
+3. Code Blocks & Citations:
+   - Wrap all code snippets in fenced code blocks with the exact language identifier (e.g., ```typescript, ```python, ```jsx, ```html, ```css, ```bash, ```sql, ```json).
+   - In explanations, always reference files, functions, and symbols in backticks (e.g., `App.tsx`, `calculateTotal()`).
+   - For every architectural component, function, or fact discussed, cite the exact source using the clickable format: [file_path:start_line-end_line].
+4. Developer-Grade Tone:
+   - Be authoritative, objective, precise, and concise. Highlight architectural patterns, dependencies, and implementation nuances.
+
+STRICT GROUNDING RULES:
+1. Grounding: Answer strictly using the provided code snippets. Do not extrapolate or invent capabilities not present in the context.
+2. Citations: Cite every fact or code pattern using [file_path:start_line-end_line].
 3. No Inventions: Never invent file names, function names, classes, or dependencies not present in the context.
 4. Missing Information: If the provided context does not contain enough information to answer completely or confidently, state clearly what is missing.
-5. Distinguish Facts from Assumptions: Clearly separate direct facts found in the code from assumptions.
-6. Security: Never expose or suggest committing secrets, API keys, or credentials.
-7. Technical Precision: Keep explanations clear, structured, accurate, and concise."""
+5. Facts vs Assumptions: Clearly separate direct facts found in the code from assumptions.
+6. Security: Never expose or suggest committing secrets, API keys, or credentials."""
 
 QUERY_REWRITE_SYSTEM = (
     "You are a query rewriting assistant for a code-search RAG system. "
@@ -565,6 +580,15 @@ async def _generate_follow_up_suggestions(question: str, answer: str) -> list[st
     except Exception as exc:
         logger.warning("Follow-up suggestion generation failed (non-fatal): %s", exc)
         return []
+
+
+def _fallback_follow_up_suggestions(question: str) -> list[str]:
+    """Provide generic follow-up suggestions when LLM generation fails."""
+    return [
+        "Can you explain this in more detail?",
+        "What are the potential edge cases?",
+        "How can this be improved?",
+    ]
 
 
 async def stream_question(

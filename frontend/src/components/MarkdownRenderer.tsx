@@ -1,7 +1,20 @@
 import React, { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { marked, type Token, type Tokens } from 'marked';
-import { Copy, Check, FileCode } from 'lucide-react';
+import { Copy, Check, FileCode, Terminal } from 'lucide-react';
+import Prism from 'prismjs';
+import 'prismjs/components/prism-javascript';
+import 'prismjs/components/prism-typescript';
+import 'prismjs/components/prism-jsx';
+import 'prismjs/components/prism-tsx';
+import 'prismjs/components/prism-python';
+import 'prismjs/components/prism-json';
+import 'prismjs/components/prism-bash';
+import 'prismjs/components/prism-markdown';
+import 'prismjs/components/prism-sql';
+import 'prismjs/components/prism-css';
+import 'prismjs/components/prism-yaml';
+import 'prismjs/components/prism-markup'; // HTML/XML
 
 interface MarkdownRendererProps {
   content: string;
@@ -10,6 +23,55 @@ interface MarkdownRendererProps {
   /** Whether to animate this message with a smooth staggered fade-rise animation */
   animate?: boolean;
   onTypingComplete?: () => void;
+  isStreaming?: boolean;
+}
+
+function highlightCode(code: string, language?: string): string {
+  if (!code) return '';
+  const lang = (language || '').toLowerCase().trim();
+  const langMap: Record<string, string> = {
+    js: 'javascript',
+    javascript: 'javascript',
+    ts: 'typescript',
+    typescript: 'typescript',
+    jsx: 'jsx',
+    tsx: 'tsx',
+    py: 'python',
+    python: 'python',
+    json: 'json',
+    sh: 'bash',
+    bash: 'bash',
+    shell: 'bash',
+    zsh: 'bash',
+    sql: 'sql',
+    html: 'markup',
+    xml: 'markup',
+    svg: 'markup',
+    css: 'css',
+    md: 'markdown',
+    markdown: 'markdown',
+    yaml: 'yaml',
+    yml: 'yaml',
+  };
+  const grammarName = langMap[lang] || lang;
+  const grammar = Prism.languages[grammarName];
+  if (grammar) {
+    try {
+      return Prism.highlight(code, grammar, grammarName);
+    } catch {
+      return escapeHtml(code);
+    }
+  }
+  return escapeHtml(code);
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 function CodeBlock({ code, language }: { code: string; language?: string }) {
@@ -25,30 +87,44 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
     }
   };
 
+  const highlightedHtml = useMemo(() => {
+    return highlightCode(code, language);
+  }, [code, language]);
+
+  const displayLanguage = language ? language.toUpperCase() : 'CODE';
+
   return (
-    <div className="my-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-900 text-zinc-100 overflow-hidden text-xs shadow-2xs">
-      <div className="flex items-center justify-between border-b border-zinc-800 bg-zinc-950 px-3.5 py-1.5 font-code text-[11px] text-zinc-400">
-        <span className="text-zinc-400 font-medium">{language || 'code'}</span>
+    <div className="my-3.5 rounded-xl border border-zinc-200/90 dark:border-zinc-800 bg-[#0d1117] dark:bg-[#090d16] text-zinc-100 overflow-hidden text-xs shadow-md">
+      {/* Code Header (Claude / ChatGPT / Replit style) */}
+      <div className="flex items-center justify-between border-b border-zinc-800 bg-[#161b22]/90 dark:bg-[#0e131f] px-4 py-2 font-code text-[11px] text-zinc-400">
+        <div className="flex items-center gap-2">
+          <Terminal className="w-3.5 h-3.5 text-zinc-400" />
+          <span className="font-semibold tracking-wider text-zinc-300">{displayLanguage}</span>
+        </div>
         <button
           type="button"
           onClick={handleCopy}
-          className="flex items-center gap-1 text-[11px] text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+          className="flex items-center gap-1.5 text-[11.5px] px-2.5 py-1 rounded-md bg-zinc-800/60 hover:bg-zinc-700/80 text-zinc-300 hover:text-white transition-all cursor-pointer font-sans-ui"
+          title="Copy code to clipboard"
         >
           {copied ? (
             <>
-              <Check className="h-3 w-3 text-zinc-300" />
-              <span className="text-zinc-300 font-sans-ui">Copied</span>
+              <Check className="h-3.5 w-3.5 text-emerald-400" />
+              <span className="text-emerald-400 font-medium">Copied!</span>
             </>
           ) : (
             <>
-              <Copy className="h-3 w-3" />
-              <span className="font-sans-ui">Copy</span>
+              <Copy className="h-3.5 w-3.5 text-zinc-400" />
+              <span>Copy</span>
             </>
           )}
         </button>
       </div>
-      <pre className="p-3.5 overflow-x-auto font-code text-zinc-200 leading-relaxed text-[12.5px]">
-        <code>{code}</code>
+      <pre className="p-4 overflow-x-auto font-code text-zinc-200 leading-relaxed text-[12.5px] sm:text-[13px]">
+        <code
+          className={`language-${language || 'text'}`}
+          dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+        />
       </pre>
     </div>
   );
@@ -65,7 +141,7 @@ function renderInlineTokens(
       case 'strong': {
         const t = token as Tokens.Strong;
         return (
-          <strong key={idx} className="font-semibold text-zinc-900 dark:text-zinc-100">
+          <strong key={idx} className="font-semibold text-zinc-950 dark:text-white">
             {renderInlineTokens(t.tokens, onOpenCode)}
           </strong>
         );
@@ -80,6 +156,7 @@ function renderInlineTokens(
       }
       case 'codespan': {
         const t = token as Tokens.Codespan;
+        // Match citation pattern: path/to/file.ext:start-end
         const match = t.text.match(/^([\w./\-]+):(\d+)(?:[–-](\d+))?$/);
         if (match && onOpenCode) {
           const [, filePath, start, end] = match;
@@ -90,10 +167,10 @@ function renderInlineTokens(
               key={idx}
               type="button"
               onClick={() => onOpenCode(filePath, startNum, endNum)}
-              className="inline-flex items-center gap-1.5 font-code text-[11.5px] text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 px-2 py-0.5 rounded-md border border-indigo-200/80 dark:border-indigo-800/60 mx-0.5 font-medium cursor-pointer transition-colors shadow-2xs group"
+              className="inline-flex items-center gap-1.5 font-code text-[11.5px] text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/70 px-2 py-0.5 rounded-md border border-indigo-200/90 dark:border-indigo-800/70 mx-0.5 font-medium cursor-pointer transition-all shadow-2xs group"
               title={`Inspect ${filePath}:${startNum}–${endNum} in CodeViewer`}
             >
-              <FileCode className="w-3 h-3 text-indigo-500 dark:text-indigo-400 group-hover:scale-110 transition-transform" />
+              <FileCode className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400 group-hover:scale-110 transition-transform" />
               <span>{t.text}</span>
             </button>
           );
@@ -101,7 +178,7 @@ function renderInlineTokens(
         return (
           <code
             key={idx}
-            className="font-code text-[12px] text-zinc-800 dark:text-zinc-200 bg-zinc-100/80 dark:bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-200/80 dark:border-zinc-700/60 mx-0.5 font-medium"
+            className="font-code text-[12px] text-pink-700 dark:text-pink-300 bg-zinc-100/90 dark:bg-zinc-800/90 px-1.5 py-0.5 rounded-md border border-zinc-200/80 dark:border-zinc-700/60 mx-0.5 font-medium"
           >
             {t.text}
           </code>
@@ -116,7 +193,7 @@ function renderInlineTokens(
             title={t.title || undefined}
             target="_blank"
             rel="noreferrer"
-            className="text-zinc-900 dark:text-zinc-100 hover:text-zinc-600 dark:hover:text-zinc-300 underline underline-offset-2 transition-colors font-medium"
+            className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 underline underline-offset-2 transition-colors font-medium"
           >
             {renderInlineTokens(t.tokens, onOpenCode)}
           </a>
@@ -139,7 +216,7 @@ function renderInlineTokens(
           return <React.Fragment key={idx}>{renderInlineTokens(t.tokens, onOpenCode)}</React.Fragment>;
         }
 
-        // Detect inline citations formatted as path/to/file.ext:10-25 or path:10
+        // Detect inline citations formatted as [path/to/file.ext:10-25] or path:10
         if (onOpenCode && /([\w\-./]+\.[a-zA-Z0-9]+):(\d+)(?:[–-](\d+))?/.test(t.text)) {
           const parts = t.text.split(/((?:[\w\-./]+\.[a-zA-Z0-9]+):(?:\d+)(?:[–-](?:\d+))?)/g);
           return (
@@ -155,10 +232,10 @@ function renderInlineTokens(
                       key={pIdx}
                       type="button"
                       onClick={() => onOpenCode(filePath, startNum, endNum)}
-                      className="inline-flex items-center gap-1.5 font-code text-[11.5px] text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 px-2 py-0.5 rounded-md border border-indigo-200/80 dark:border-indigo-800/60 mx-0.5 font-medium cursor-pointer transition-colors shadow-2xs group"
+                      className="inline-flex items-center gap-1.5 font-code text-[11.5px] text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/70 px-2 py-0.5 rounded-md border border-indigo-200/90 dark:border-indigo-800/70 mx-0.5 font-medium cursor-pointer transition-all shadow-2xs group"
                       title={`Inspect ${filePath}:${startNum}–${endNum} in CodeViewer`}
                     >
-                      <FileCode className="w-3 h-3 text-indigo-500 dark:text-indigo-400 group-hover:scale-110 transition-transform" />
+                      <FileCode className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400 group-hover:scale-110 transition-transform" />
                       <span>{part}</span>
                     </button>
                   );
@@ -185,12 +262,12 @@ function renderBlockToken(
       const t = token as Tokens.Heading;
       const HeadingTag = `h${Math.min(Math.max(t.depth, 1), 6)}` as React.ElementType;
       const headingStyles: Record<number, string> = {
-        1: 'text-lg font-semibold text-zinc-900 dark:text-white mt-4 mb-2 tracking-tight',
-        2: 'text-base font-semibold text-zinc-900 dark:text-white mt-3.5 mb-1.5 tracking-tight',
-        3: 'text-[14.5px] font-semibold text-zinc-900 dark:text-zinc-100 mt-3 mb-1 tracking-tight',
-        4: 'text-sm font-semibold text-zinc-900 dark:text-zinc-200 mt-2.5 mb-1',
-        5: 'text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mt-2 mb-1',
-        6: 'text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-500 mt-2 mb-1',
+        1: 'text-lg font-bold text-zinc-950 dark:text-white mt-5 mb-2.5 tracking-tight border-b border-zinc-200/80 dark:border-zinc-800/80 pb-1.5',
+        2: 'text-[16px] font-bold text-zinc-950 dark:text-white mt-4 mb-2 tracking-tight',
+        3: 'text-[14.5px] font-semibold text-zinc-900 dark:text-zinc-100 mt-3.5 mb-1.5 tracking-tight',
+        4: 'text-sm font-semibold text-zinc-900 dark:text-zinc-200 mt-3 mb-1',
+        5: 'text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mt-2.5 mb-1',
+        6: 'text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-500 mt-2.5 mb-1',
       };
       return (
         <HeadingTag key={key} className={headingStyles[t.depth] || headingStyles[3]}>
@@ -201,7 +278,7 @@ function renderBlockToken(
     case 'paragraph': {
       const t = token as Tokens.Paragraph;
       return (
-        <p key={key} className="my-2 text-[14px] sm:text-[14.5px] leading-relaxed text-zinc-800 dark:text-zinc-200 font-sans-ui">
+        <p key={key} className="my-2.5 text-[14px] sm:text-[14.5px] leading-relaxed text-zinc-800 dark:text-zinc-200 font-sans-ui">
           {t.tokens ? renderInlineTokens(t.tokens, onOpenCode) : t.text}
         </p>
       );
@@ -214,7 +291,7 @@ function renderBlockToken(
       const t = token as Tokens.List;
       if (t.ordered) {
         return (
-          <ol key={key} start={t.start || 1} className="my-2 space-y-1.5 pl-5 list-decimal text-zinc-800 dark:text-zinc-200 text-[14px] sm:text-[14.5px] leading-relaxed font-sans-ui">
+          <ol key={key} start={t.start || 1} className="my-2.5 space-y-1.5 pl-5 list-decimal text-zinc-800 dark:text-zinc-200 text-[14px] sm:text-[14.5px] leading-relaxed font-sans-ui">
             {t.items.map((item, i) => (
               <li key={i} className="pl-1">
                 {item.tokens ? renderInlineTokens(item.tokens, onOpenCode) : item.text}
@@ -224,7 +301,7 @@ function renderBlockToken(
         );
       }
       return (
-        <ul key={key} className="my-2 space-y-1.5 pl-5 list-disc text-zinc-800 dark:text-zinc-200 text-[14px] sm:text-[14.5px] leading-relaxed marker:text-zinc-400 dark:marker:text-zinc-500 font-sans-ui">
+        <ul key={key} className="my-2.5 space-y-1.5 pl-5 list-disc text-zinc-800 dark:text-zinc-200 text-[14px] sm:text-[14.5px] leading-relaxed marker:text-zinc-400 dark:marker:text-zinc-500 font-sans-ui">
           {t.items.map((item, i) => (
             <li key={i} className="pl-1">
               {item.tokens ? renderInlineTokens(item.tokens, onOpenCode) : item.text}
@@ -238,7 +315,7 @@ function renderBlockToken(
       return (
         <blockquote
           key={key}
-          className="my-3 border-l-2 border-zinc-400 dark:border-zinc-600 bg-zinc-100/50 dark:bg-zinc-900/40 py-2 px-3.5 text-zinc-700 dark:text-zinc-300 rounded-r-lg text-[13.5px] leading-relaxed font-sans-ui"
+          className="my-3.5 border-l-4 border-indigo-500/80 dark:border-indigo-400 bg-indigo-50/40 dark:bg-indigo-950/20 py-2.5 px-4 text-zinc-800 dark:text-zinc-200 rounded-r-xl text-[13.5px] leading-relaxed font-sans-ui shadow-2xs"
         >
           {t.tokens ? t.tokens.map((subToken, i) => renderBlockToken(subToken, i, onOpenCode)) : t.text}
         </blockquote>
@@ -247,22 +324,22 @@ function renderBlockToken(
     case 'table': {
       const t = token as Tokens.Table;
       return (
-        <div key={key} className="my-3.5 overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 shadow-2xs">
-          <table className="w-full text-left text-[13px] font-sans-ui">
-            <thead className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300">
+        <div key={key} className="my-4 overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/70 shadow-xs">
+          <table className="w-full text-left text-[13px] font-sans-ui border-collapse">
+            <thead className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-900 dark:text-zinc-200">
               <tr>
                 {t.header.map((cell, i) => (
-                  <th key={i} className="px-3.5 py-2 font-semibold text-xs tracking-tight">
+                  <th key={i} className="px-4 py-2.5 font-semibold text-xs tracking-tight uppercase text-zinc-600 dark:text-zinc-400">
                     {renderInlineTokens(cell.tokens, onOpenCode)}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-200/80 dark:divide-zinc-800/60 text-zinc-800 dark:text-zinc-300">
+            <tbody className="divide-y divide-zinc-200/70 dark:divide-zinc-800/60 text-zinc-800 dark:text-zinc-300">
               {t.rows.map((row, rIdx) => (
-                <tr key={rIdx} className="hover:bg-zinc-50/80 dark:hover:bg-white/[0.02] transition-colors">
+                <tr key={rIdx} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 transition-colors">
                   {row.map((cell, cIdx) => (
-                    <td key={cIdx} className="px-3.5 py-2.5 leading-relaxed">
+                    <td key={cIdx} className="px-4 py-2.5 leading-relaxed">
                       {renderInlineTokens(cell.tokens, onOpenCode)}
                     </td>
                   ))}
@@ -293,6 +370,7 @@ export default function MarkdownRenderer({
   onOpenCode,
   animate = false,
   onTypingComplete,
+  isStreaming = false,
 }: MarkdownRendererProps) {
   const tokens = useMemo(() => {
     try {
@@ -321,12 +399,18 @@ export default function MarkdownRenderer({
           className={`whitespace-pre-wrap leading-relaxed font-sans-ui text-zinc-800 dark:text-zinc-200 ${className}`}
         >
           {content}
+          {isStreaming && (
+            <span className="inline-block w-2 h-4 ml-1 align-middle bg-indigo-500 dark:bg-indigo-400 rounded-xs animate-pulse" />
+          )}
         </motion.div>
       );
     }
     return (
       <div className={`whitespace-pre-wrap leading-relaxed font-sans-ui text-zinc-800 dark:text-zinc-200 ${className}`}>
         {content}
+        {isStreaming && (
+          <span className="inline-block w-2 h-4 ml-1 align-middle bg-indigo-500 dark:bg-indigo-400 rounded-xs animate-pulse" />
+        )}
       </div>
     );
   }
@@ -368,6 +452,9 @@ export default function MarkdownRenderer({
             {renderBlockToken(token, idx, onOpenCode)}
           </motion.div>
         ))}
+        {isStreaming && (
+          <span className="inline-block w-2 h-4 ml-1 align-middle bg-indigo-500 dark:bg-indigo-400 rounded-xs animate-pulse" />
+        )}
       </motion.div>
     );
   }
@@ -375,6 +462,9 @@ export default function MarkdownRenderer({
   return (
     <div className={`markdown-body max-w-[72ch] text-[14px] sm:text-[14.5px] leading-relaxed text-zinc-800 dark:text-zinc-200 font-sans-ui ${className}`}>
       {tokens.map((token, idx) => renderBlockToken(token, idx, onOpenCode))}
+      {isStreaming && (
+        <span className="inline-block w-2 h-4 ml-1 align-middle bg-indigo-500 dark:bg-indigo-400 rounded-xs animate-pulse" />
+      )}
     </div>
   );
 }

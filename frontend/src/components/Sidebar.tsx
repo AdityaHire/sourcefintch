@@ -735,20 +735,26 @@ function SidebarUserRowExpanded({
   primaryEmail?: string | null;
 }) {
   if (isSignedIn) {
+    const triggerElement = useMemo(() => (
+      <button type="button" className="w-full flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition-colors duration-100 hover:bg-zinc-100 dark:hover:bg-white/[0.06] cursor-pointer" aria-label="Open account menu">
+        {imageUrl ? (
+          <img src={imageUrl} alt={displayName} className="h-7 w-7 rounded-full object-cover ring-1 ring-zinc-200 dark:ring-zinc-700 shrink-0" />
+        ) : (
+          <div className="h-7 w-7 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 flex items-center justify-center text-[11px] font-semibold shrink-0">{initials}</div>
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="text-[12px] font-semibold text-zinc-900 dark:text-white truncate font-sans-ui">{userLoaded ? (primaryEmail || displayName) : '…'}</div>
+          {primaryEmail && <div className="text-[10.5px] text-zinc-500 dark:text-zinc-400 truncate font-sans-ui">{displayName}</div>}
+        </div>
+      </button>
+    ), [imageUrl, displayName, initials, primaryEmail, userLoaded]);
+
     return (
-      <UserButton afterSignOutUrl="/" appearance={{ elements: { userButtonBox: 'hidden', userButtonOuterBox: 'hidden' } }}>
-        <button type="button" className="w-full flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition-colors duration-100 hover:bg-zinc-100 dark:hover:bg-white/[0.06] cursor-pointer" aria-label="Open account menu">
-          {imageUrl ? (
-            <img src={imageUrl} alt={displayName} className="h-7 w-7 rounded-full object-cover ring-1 ring-zinc-200 dark:ring-zinc-700 shrink-0" />
-          ) : (
-            <div className="h-7 w-7 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 flex items-center justify-center text-[11px] font-semibold shrink-0">{initials}</div>
-          )}
-          <div className="flex-1 min-w-0">
-            <div className="text-[12px] font-semibold text-zinc-900 dark:text-white truncate font-sans-ui">{userLoaded ? (primaryEmail || displayName) : '…'}</div>
-            {primaryEmail && <div className="text-[10.5px] text-zinc-500 dark:text-zinc-400 truncate font-sans-ui">{displayName}</div>}
-          </div>
-        </button>
-      </UserButton>
+      <UserButton
+        afterSignOutUrl="/"
+        appearance={{ elements: { userButtonBox: 'hidden', userButtonOuterBox: 'hidden' } }}
+        triggerElement={triggerElement}
+      />
     );
   }
 

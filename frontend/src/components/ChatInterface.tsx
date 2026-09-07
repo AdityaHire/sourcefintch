@@ -28,6 +28,8 @@ import {
   FolderTree,
   History,
   ArrowRight,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { ConversationHistoryDrawer } from './ConversationHistoryDrawer';
 import type { Conversation } from '../types';
@@ -79,6 +81,17 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
+  const [copiedMsgId, setCopiedMsgId] = useState<number | string | null>(null);
+
+  const handleCopyMessage = async (msgId: number | string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedMsgId(msgId);
+      setTimeout(() => setCopiedMsgId(null), 2000);
+    } catch {
+      // Fallback
+    }
+  };
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<PromptInputBoxHandle>(null);
@@ -735,28 +748,64 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
                         </div>
                       </div>
                      ) : (
-                      /* Assistant message: structured document format */
+                      /* Assistant message: structured document with subtle background */
                       <div className="flex flex-col items-start w-full">
-                        {msg.content ? (
-                          <MarkdownRenderer
-                            content={msg.content}
-                            onOpenCode={handleOpenCode}
-                            animate={false}
-                            onTypingComplete={scrollToBottom}
-                          />
-                        ) : isSubmitting && index === messages.length - 1 ? (
-                          <div className="flex items-center gap-2.5 py-2 px-1 text-xs text-zinc-500 dark:text-zinc-400 font-sans-ui">
-                            <span className="relative flex h-2 w-2">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                            </span>
-                            <span>Searching codebase & reasoning...</span>
-                          </div>
-                        ) : (
-                          <div className="max-w-[72ch] rounded-xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/[0.06] px-4 py-3 text-xs text-amber-900 dark:text-amber-200 font-sans-ui">
-                            No answer was generated for this question. The LLM returned an empty response — this can happen with very short queries or if the model truncated its output. Try rephrasing your question.
-                          </div>
-                        )}
+                        <div className="w-full max-w-[76ch] rounded-2xl border border-zinc-200/80 dark:border-zinc-800/70 bg-white/70 dark:bg-zinc-900/40 backdrop-blur-xs p-4 sm:p-5 shadow-xs transition-all">
+                          {msg.content ? (
+                            <>
+                              <MarkdownRenderer
+                                content={msg.content}
+                                onOpenCode={handleOpenCode}
+                                animate={false}
+                                onTypingComplete={scrollToBottom}
+                                isStreaming={isSubmitting && index === messages.length - 1}
+                              />
+                              {/* Message Actions Toolbar (Improved Copy response button) */}
+                              <div className="flex items-center justify-between border-t border-zinc-100 dark:border-zinc-800/80 mt-4 pt-3 text-zinc-400">
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyMessage(msg.id || index, msg.content)}
+                                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer shadow-2xs border ${
+                                    copiedMsgId === (msg.id || index)
+                                      ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800/70'
+                                      : 'bg-white dark:bg-zinc-800/80 hover:bg-zinc-100 dark:hover:bg-zinc-700/80 text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white border-zinc-200/90 dark:border-zinc-700/80'
+                                  }`}
+                                  title="Copy response to clipboard"
+                                >
+                                  {copiedMsgId === (msg.id || index) ? (
+                                    <>
+                                      <Check className="w-3.5 h-3.5 text-emerald-500" />
+                                      <span>Copied response</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy className="w-3.5 h-3.5 text-zinc-400" />
+                                      <span>Copy response</span>
+                                    </>
+                                  )}
+                                </button>
+
+                                {msg.sources && msg.sources.length > 0 && (
+                                  <span className="text-[11px] text-zinc-400 dark:text-zinc-500 font-sans-ui">
+                                    {msg.sources.length} source{msg.sources.length === 1 ? '' : 's'} cited
+                                  </span>
+                                )}
+                              </div>
+                            </>
+                          ) : isSubmitting && index === messages.length - 1 ? (
+                            <div className="flex items-center gap-2.5 py-2 px-1 text-xs text-zinc-500 dark:text-zinc-400 font-sans-ui">
+                              <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                              </span>
+                              <span>Searching codebase & reasoning...</span>
+                            </div>
+                          ) : (
+                            <div className="rounded-xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/[0.06] px-4 py-3 text-xs text-amber-900 dark:text-amber-200 font-sans-ui">
+                              No answer was generated for this question. The LLM returned an empty response — this can happen with very short queries or if the model truncated its output. Try rephrasing your question.
+                            </div>
+                          )}
+                        </div>
 
                         {/* ── CITED SOURCES · Prominent Interactive Table ── */}
                         {msg.sources && msg.sources.length > 0 && (
@@ -764,7 +813,7 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
                             initial={{ opacity: 0, y: 6 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.3, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-                            className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-900/80 w-full max-w-[72ch]"
+                            className="mt-3 w-full max-w-[76ch]"
                           >
                             <div className="flex items-center justify-between mb-2">
                               <div className="text-[11px] font-semibold tracking-wider text-zinc-500 dark:text-zinc-400 uppercase font-sans-ui flex items-center gap-1.5">

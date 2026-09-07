@@ -136,20 +136,30 @@ export const PromptInputBox = forwardRef<PromptInputBoxHandle, PromptInputBoxPro
           handleSend();
         }}
         className={cn(
-          'relative flex flex-col',
+          'relative flex items-end gap-2',
           'rounded-2xl',
-          'border border-zinc-200/90 dark:border-white/[0.09]',
-          'bg-white/90 dark:bg-zinc-900/85',
-          'shadow-xl shadow-zinc-200/40 dark:shadow-black/50',
+          'border border-zinc-200/90 dark:border-white/[0.10]',
+          'bg-white/95 dark:bg-zinc-900/90',
+          'shadow-lg shadow-zinc-200/30 dark:shadow-black/40',
           'backdrop-blur-xl',
           'transition-[border-color,box-shadow] duration-150 ease-out',
           'focus-within:border-zinc-400 dark:focus-within:border-zinc-600',
-          'focus-within:ring-2 focus-within:ring-zinc-400/15 dark:focus-within:ring-white/10',
-          'p-2',
+          'focus-within:ring-2 focus-within:ring-indigo-500/15 dark:focus-within:ring-indigo-400/10',
+          'px-3 py-1.5',
           className
         )}
       >
-        {/* ── Top text area ────────────────────────────────────────────────── */}
+        {/* Left context button */}
+        <button
+          type="button"
+          disabled={disabled}
+          title="Add context"
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer shrink-0 mb-0.5 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <Plus className="w-4 h-4" />
+        </button>
+
+        {/* Textarea */}
         <textarea
           ref={taRef}
           value={value}
@@ -160,8 +170,8 @@ export const PromptInputBox = forwardRef<PromptInputBoxHandle, PromptInputBoxPro
           aria-label={ariaLabel}
           rows={1}
           className={cn(
-            'w-full resize-none bg-transparent',
-            'px-1 py-1 text-[13.5px] leading-relaxed',
+            'flex-1 resize-none bg-transparent',
+            'py-1 text-[13.5px] leading-relaxed',
             'text-zinc-900 dark:text-zinc-100',
             'placeholder:text-zinc-400 dark:placeholder:text-zinc-500',
             'font-sans-ui',
@@ -175,63 +185,48 @@ export const PromptInputBox = forwardRef<PromptInputBoxHandle, PromptInputBoxPro
           }}
         />
 
-        {/* ── Bottom toolbar row inside composer ───────────────────────────── */}
-        <div className="flex items-center justify-between pt-2 mt-1 border-t border-zinc-100/80 dark:border-white/[0.04]">
-          {/* Left: action button */}
-          <div className="flex items-center gap-1">
+        {/* Right action group: RAG badge + Send button */}
+        <div className="flex items-center gap-1.5 shrink-0 mb-0.5">
+          <div className="hidden sm:flex items-center gap-1 rounded-md bg-zinc-100 dark:bg-white/[0.05] border border-zinc-200/60 dark:border-white/[0.06] px-2 py-0.5 text-[11px] font-medium text-zinc-500 dark:text-zinc-400 font-sans-ui select-none">
+            <Sparkles className="w-3 h-3 text-orange-500 dark:text-orange-400" />
+            <span>RAG</span>
+          </div>
+
+          {isStreaming ? (
             <button
               type="button"
-              disabled={disabled}
-              title="Add context"
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              onClick={handleStop}
+              title="Stop generating"
+              aria-label="Stop generating"
+              className="h-7 w-7 rounded-lg flex items-center justify-center bg-rose-600 hover:bg-rose-700 text-white transition-colors duration-100 shadow-xs cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
+              <Square className="h-3 w-3" fill="currentColor" />
             </button>
-          </div>
-
-          {/* Right: badge & send button */}
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 rounded-md bg-zinc-100 dark:bg-white/[0.05] border border-zinc-200/50 dark:border-white/[0.06] px-2 py-1 text-[11px] font-medium text-zinc-500 dark:text-zinc-400 font-sans-ui select-none">
-              <Sparkles className="w-3 h-3 text-orange-500 dark:text-orange-400" />
-              <span>RAG</span>
-            </div>
-
-            {isStreaming ? (
-              <button
-                type="button"
-                onClick={handleStop}
-                title="Stop generating"
-                aria-label="Stop generating"
-                className="h-7 w-7 rounded-lg flex items-center justify-center bg-rose-600 hover:bg-rose-700 text-white transition-colors duration-100 shadow-xs cursor-pointer"
-              >
-                <Square className="h-3 w-3" fill="currentColor" />
-              </button>
-            ) : isSending ? (
-              <button
-                type="button"
-                disabled
-                aria-label="Sending"
-                className="h-7 w-7 rounded-lg flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 cursor-not-allowed opacity-70"
-              >
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              </button>
-            ) : (
-              <button
-                type="submit"
-                disabled={!canSend}
-                title={canSend ? 'Send message (Enter)' : 'Type a message to send'}
-                aria-label="Send message"
-                className={cn(
-                  'h-7 w-7 rounded-lg flex items-center justify-center transition-all duration-100',
-                  canSend
-                    ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-200 cursor-pointer shadow-xs active:scale-95'
-                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed opacity-50'
-                )}
-              >
-                <ArrowUp className="h-3.5 w-3.5" strokeWidth={2.25} />
-              </button>
-            )}
-          </div>
+          ) : isSending ? (
+            <button
+              type="button"
+              disabled
+              aria-label="Sending"
+              className="h-7 w-7 rounded-lg flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 cursor-not-allowed opacity-70"
+            >
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={!canSend}
+              title={canSend ? 'Send message (Enter)' : 'Type a message to send'}
+              aria-label="Send message"
+              className={cn(
+                'h-7 w-7 rounded-lg flex items-center justify-center transition-all duration-100',
+                canSend
+                  ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-200 cursor-pointer shadow-xs active:scale-95'
+                  : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed opacity-50'
+              )}
+            >
+              <ArrowUp className="h-3.5 w-3.5" strokeWidth={2.25} />
+            </button>
+          )}
         </div>
       </form>
     );

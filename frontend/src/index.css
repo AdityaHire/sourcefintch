@@ -3,6 +3,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 @import "./styles/fonts.css";
 @import "./styles/tokens.css";
+@import "./styles/prism.css";
 
 /*
  * Sourcefinch Design System & Global Styles

@@ -1,0 +1,93 @@
+/* Prism Syntax Highlighting Theme — Claude / ChatGPT / Replit Dark Aesthetic */
+
+pre[class*="language-"],
+code[class*="language-"] {
+  color: #e4e4e7;
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  direction: ltr;
+  text-align: left;
+  white-space: pre;
+  word-spacing: normal;
+  word-break: normal;
+  line-height: 1.6;
+  tab-size: 2;
+  hyphens: none;
+}
+
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #71717a;
+  font-style: italic;
+}
+
+.token.punctuation {
+  color: #a1a1aa;
+}
+
+.token.namespace {
+  opacity: 0.7;
+}
+
+.token.property,
+.token.tag,
+.token.constant,
+.token.symbol,
+.token.deleted {
+  color: #f43f5e; /* rose */
+}
+
+.token.boolean,
+.token.number {
+  color: #fb923c; /* orange */
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+  color: #34d399; /* emerald */
+}
+
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string {
+  color: #38bdf8; /* sky */
+}
+
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+  color: #c084fc; /* purple/violet */
+  font-weight: 500;
+}
+
+.token.function,
+.token.class-name {
+  color: #60a5fa; /* blue */
+  font-weight: 500;
+}
+
+.token.regex,
+.token.important,
+.token.variable {
+  color: #f59e0b; /* amber */
+}
+
+.token.important,
+.token.bold {
+  font-weight: bold;
+}
+
+.token.italic {
+  font-style: italic;
+}
+
+.token.entity {
+  cursor: help;
+}
