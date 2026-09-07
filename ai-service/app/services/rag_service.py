@@ -90,8 +90,6 @@ STRICT RULES:
 6. Security: Never expose or suggest committing secrets, API keys, or credentials.
 7. Technical Precision: Keep explanations clear, structured, accurate, and concise."""
 
-QUERY_REWRITE_MODEL = "llama-3.1-8b-instant"
-QUERY_REWRITE_URL = "https://api.groq.com/openai/v1/chat/completions"
 QUERY_REWRITE_SYSTEM = (
     "You are a query rewriting assistant for a code-search RAG system. "
     "Given a conversation history and a new user question, rewrite the new question into a "

@@ -23,9 +23,9 @@ class Settings(BaseSettings):
     llm_provider: str = "groq"
     llm_api_key: str = ""  # General LLM key
     groq_api_key: str = ""  # Groq-specific key
-    # llama-3.3-70b-versatile is the recommended stable Groq model.
-    # openai/gpt-oss-20b is NOT a valid Groq model and will cause 400 errors.
-    llm_model: str = "llama-3.3-70b-versatile"
+    # openai/gpt-oss-20b is the current recommended Groq model.
+    # llama-3.3-70b-versatile was removed from Groq and will cause 404 errors.
+    llm_model: str = "openai/gpt-oss-20b"
     llm_timeout_seconds: float = 30.0
 
     # ── Report LLM (Gemini for long-form report synthesis) ────────
@@ -50,8 +50,10 @@ class Settings(BaseSettings):
     hybrid_bm25_weight: float = 1.0
 
     # ── Embeddings ──────────────────────────────────
-    embedding_provider: str = "local"
-    embedding_model: str = "all-MiniLM-L6-v2"
+    # Gemini is the recommended provider for Render deployments — the local
+    # SentenceTransformer model (90 MB) OOMs on Render's 512 MiB Starter plan.
+    embedding_provider: str = "gemini"
+    embedding_model: str = "all-MiniLM-L6-v2"  # Only used when embedding_provider=local
     embedding_api_key: str = ""
     # Gemini embedding provider (optional alternative to local)
     gemini_api_key: str = ""
