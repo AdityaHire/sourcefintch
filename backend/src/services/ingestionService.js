@@ -272,6 +272,18 @@ const ingestRepository = async (repositoryId, githubUrl, branch) => {
 
     await updateStatus(repositoryId, 'storing', { file_count: fileCount });
 
+    // ── Safety net: mark completed even if the AI service never responds ──
+    // The AI service is responsible for the embedding/chunking phase and
+    // normally flips the status to 'embedding' then 'completed'.  If the AI
+    // service is unreachable (misconfigured NODE_API_URL, deploy restart,
+    // crash, etc.) we must NOT leave the repo stuck in 'storing' forever —
+    // that would permanently block the user from adding another repository.
+    //
+    // By marking 'completed' here, the files are still queryable via the
+    // API even without embeddings.  If the AI service later runs, it will
+    // transition storing → embedding → completed as usual.
+    await updateStatus(repositoryId, 'completed', { file_count: fileCount });
+
     // ── Trigger AI service parsing (fire-and-forget) ──────────────────
     // Node's job is done — kick off the Python AI service to parse and
     // chunk the code.  We don't await the result; Python processes in the

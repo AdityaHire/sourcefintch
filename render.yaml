@@ -36,7 +36,10 @@ services:
       - key: QDRANT_API_KEY
         sync: false
       - key: NODE_API_URL
-        sync: false
+        fromService:
+          type: web
+          name: sourcefinch-backend
+          property: host
       - key: INTERNAL_API_SECRET
         sync: false
 

@@ -34,7 +34,7 @@ import stat
 import subprocess
 import tempfile
 import uuid
-from typing import Any
+from typing import Any, Optional
 
 import httpx
 from fastapi import HTTPException
@@ -67,22 +67,34 @@ def _remove_readonly(func, path, excinfo):
         pass
 
 
-def _cleanup_dir(path: str) -> None:
+def _cleanup_dir(path: Optional[str]) -> None:
     """Safely remove a directory even with read-only files on Windows."""
+    if not path:
+        return
     if os.path.exists(path):
         shutil.rmtree(path, onerror=_remove_readonly)
 
 
 async def fetch_file_list(repository_id: int) -> list[dict]:
-    """Fetch the file list from Node's GET /api/repositories/:id/files.
+    """Fetch the file list (WITH content) from Node's GET /api/repositories/:id/files.
+
+    We request `include_content=true` because Node already read every file
+    during its own clone+scan phase and stored the content in MySQL.  By
+    pulling content from Node instead of re-cloning the repo here we:
+
+      * Avoid a second full `git clone` (halves total ingestion time).
+      * Guarantee the exact same file set Node stored (no race between the
+        two clones, no branch drift).
+      * Remove the dependency on `git` being available in the AI container.
 
     Returns:
-        A list of file dicts with keys: id, file_path, language, file_size.
+        A list of file dicts with keys: id, file_path, language, file_size,
+        content (str, possibly empty for files Node couldn't decode).
 
     Raises:
         HTTPException(502) if Node's API is unreachable or returns non-2xx.
     """
-    url = f"{settings.node_api_url}/api/repositories/{repository_id}/files"
+    url = f"{settings.node_api_url}/api/repositories/{repository_id}/files?include_content=true"
 
     try:
         response = await async_internal_get(url)
@@ -196,7 +208,12 @@ async def insert_chunks_batch(chunks: list[dict]) -> list[dict]:
 
 
 def clone_repository(github_url: str, branch: str, clone_dir: str) -> None:
-    """Clone a repository into the given directory."""
+    """Clone a repository into the given directory.
+
+    Kept as a fallback for environments where Node cannot store file
+    content (e.g. very old ingests).  The primary path now pulls content
+    directly from Node's API, so this is rarely invoked.
+    """
     try:
         result = subprocess.run(
             ["git", "clone", "--depth", "1", "--branch", branch, github_url, clone_dir],
@@ -224,6 +241,31 @@ def clone_repository(github_url: str, branch: str, clone_dir: str) -> None:
         )
 
 
+def _read_file_content(file_info: dict, clone_dir: Optional[str]) -> str:
+    """Return the content for a file, preferring Node's stored copy.
+
+    Node stores full file content in MySQL during its own scan phase, so
+    when it is available we use it directly — no second clone needed.  If
+    Node did not store content (legacy ingest or content was stripped),
+    fall back to reading from a local clone directory if one was provided.
+    """
+    content = file_info.get("content")
+    if content is not None:
+        return content
+
+    if not clone_dir:
+        return ""
+
+    file_path = file_info.get("file_path", "")
+    full_path = os.path.join(clone_dir, file_path)
+    try:
+        with open(full_path, encoding="utf-8", errors="replace") as f:
+            return f.read()
+    except (FileNotFoundError, OSError, PermissionError) as exc:
+        logger.warning("Skipping unreadable file %s: %s", file_path, exc)
+        return ""
+
+
 async def parse_repository(
     repository_id: int, github_url: str, branch: str
 ) -> dict:
@@ -232,7 +274,7 @@ async def parse_repository(
     Returns a dict with: repository_id, files_parsed, files_skipped,
     total_chunks, total_chunks_embedded, chunks.
     """
-    # 1. Fetch the file list from Node
+    # 1. Fetch the file list from Node (includes content Node already stored)
     file_list = await fetch_file_list(repository_id)
     file_path_to_id = {f["file_path"]: f["id"] for f in file_list}
 
@@ -242,17 +284,27 @@ async def parse_repository(
         repository_id,
     )
 
-    # 2. Create a temp directory scoped to this repository
-    clone_dir = tempfile.mkdtemp(prefix=f"sourcefinch-ai-{repository_id}-")
+    # 2. Only clone if Node did NOT store file content (legacy ingest fallback).
+    #    When content is present we read it directly from the API response,
+    #    avoiding a second full clone and keeping the two services in sync.
+    needs_clone = any(not f.get("content") for f in file_list)
+    clone_dir = None
+    if needs_clone:
+        clone_dir = tempfile.mkdtemp(prefix=f"sourcefinch-ai-{repository_id}-")
 
     try:
-        # 3. Clone the repo
-        clone_repository(github_url, branch, clone_dir)
-        logger.info(
-            "Cloned %s (branch: %s) into %s", github_url, branch, clone_dir
-        )
+        if needs_clone:
+            clone_repository(github_url, branch, clone_dir)
+            logger.info(
+                "Cloned %s (branch: %s) into %s", github_url, branch, clone_dir
+            )
+        else:
+            logger.info(
+                "Skipping clone — using file content stored by Node for repository %d",
+                repository_id,
+            )
 
-        # 4. Read and chunk each file
+        # 3. Read and chunk each file
         all_chunks = []
         files_parsed = 0
         files_skipped = 0
@@ -267,16 +319,8 @@ async def parse_repository(
                 files_skipped += 1
                 continue
 
-            full_path = os.path.join(clone_dir, file_path)
-
-            # Read file content with encoding safety
-            try:
-                with open(full_path, encoding="utf-8", errors="replace") as f:
-                    content = f.read()
-            except (FileNotFoundError, OSError, PermissionError) as exc:
-                logger.warning(
-                    "Skipping unreadable file %s: %s", file_path, exc
-                )
+            content = _read_file_content(file_info, clone_dir)
+            if not content:
                 files_skipped += 1
                 continue
 
@@ -430,5 +474,6 @@ async def parse_repository(
             detail=f"Failed to parse and index repository: {exc}",
         )
     finally:
-        _cleanup_dir(clone_dir)
-        logger.info("Cleaned up temp directory: %s", clone_dir)
+        if clone_dir:
+            _cleanup_dir(clone_dir)
+            logger.info("Cleaned up temp directory: %s", clone_dir)
