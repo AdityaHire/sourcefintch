@@ -25,6 +25,7 @@ services:
       - key: QDRANT_COLLECTION_NAME
         value: sourcefinch_chunks
       - key: CORS_ORIGIN
+        value: https://sourcefintch.vercel.app,https://*.vercel.app
         sync: false
       - key: GROQ_API_KEY
         sync: false
@@ -53,6 +54,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: CORS_ORIGIN
+        value: https://sourcefintch.vercel.app,https://*.vercel.app
         sync: false
       - key: MYSQL_HOST
         sync: false

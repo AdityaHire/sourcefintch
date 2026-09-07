@@ -13,14 +13,38 @@ const path = require('path');
 // Load .env from the backend root (one level up from src/config/)
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
+/**
+ * Parse CORS_ORIGIN into an array of allowed origins.
+ *
+ * Supports a comma-separated list so you can allow multiple origins
+ * (e.g. production + preview/staging) in a single env var:
+ *   CORS_ORIGIN=https://app.example.com,https://app-xyz.vercel.app
+ *
+ * Additionally, in non-production environments, any `*.vercel.app` origin
+ * is auto-allowed so Vercel preview deployments never break the app again.
+ */
+function parseCorsOrigins(raw) {
+  if (!raw) {
+    return 'http://localhost:5173';
+  }
+
+  const origins = raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (process.env.NODE_ENV !== 'production') {
+    // Auto-allow every Vercel preview deployment during local/dev/staging.
+    origins.push('https://*.vercel.app');
+  }
+
+  return origins.length === 1 ? origins[0] : origins;
+}
+
 const config = {
   port: parseInt(process.env.PORT, 10) || 3001,
   nodeEnv: process.env.NODE_ENV || 'development',
-  corsOrigin: process.env.CORS_ORIGIN
-    ? (process.env.CORS_ORIGIN.includes(',')
-        ? process.env.CORS_ORIGIN.split(',').map((s) => s.trim())
-        : process.env.CORS_ORIGIN)
-    : 'http://localhost:5173',
+  corsOrigin: parseCorsOrigins(process.env.CORS_ORIGIN),
 
   // ── MySQL ──────────────────────────────────────────
   mysql: {

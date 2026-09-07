@@ -19,6 +19,7 @@ Three handlers cover all cases:
 """
 
 import logging
+import re
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -88,14 +89,32 @@ app = FastAPI(
 )
 
 # ── CORS ────────────────────────────────────────────
-# Allow the frontend (and Node backend) to call this service
-_cors_origins = [o.strip() for o in settings.cors_origin.split(",") if o.strip()]
+# Allow the frontend (and Node backend) to call this service.
+# FastAPI's CORSMiddleware does not understand `*.vercel.app` wildcards in
+# `allow_origins`, so we split the configured origins into exact origins and
+# a single `origin_regex` that matches any Vercel preview deployment.
+_cors_raw = [o.strip() for o in settings.cors_origin.split(",") if o.strip()]
+
+exact_origins = []
+wildcard_regex = None
+for entry in _cors_raw:
+    if "*" in entry:
+        # `https://*.vercel.app` -> ^https://[^/]+\.vercel\.app$
+        escaped = re.escape(entry).replace(r"\*", ".*")
+        wildcard_regex = f"^{escaped}$"
+    else:
+        exact_origins.append(entry)
+
+if not exact_origins and not wildcard_regex:
+    exact_origins = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_cors_origins if _cors_origins else ["*"],
+    allow_origins=exact_origins or ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    **({"origin_regex": wildcard_regex} if wildcard_regex else {}),
 )
 
 

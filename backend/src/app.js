@@ -30,9 +30,44 @@ app.use(clerkAuth);
 app.use(express.json());
 
 // ── 2. CORS ────────────────────────────────────────
+// `config.corsOrigin` may be a string, an array, or contain wildcard
+// patterns like `https://*.vercel.app`.  The `cors` package doesn't
+// understand wildcards, so we normalize the list into exact origins and
+// a list of wildcard patterns, then use a custom `origin` function.
+const rawOrigins = Array.isArray(config.corsOrigin)
+  ? config.corsOrigin
+  : [config.corsOrigin];
+
+const exactOrigins = [];
+const wildcardPatterns = [];
+
+for (const entry of rawOrigins) {
+  if (typeof entry !== 'string') continue;
+  if (entry.includes('*')) {
+    // Convert `https://*.vercel.app` into a regex: ^https://[^/]+\.vercel\.app$
+    const escaped = entry
+      .replace(/[.+^${}()|[\]\\]/g, '\\$&') // escape regex specials
+      .replace(/\*/g, '.*'); // wildcard -> .*
+    wildcardPatterns.push(new RegExp(`^${escaped}$`));
+  } else {
+    exactOrigins.push(entry);
+  }
+}
+
+function isOriginAllowed(origin) {
+  if (!origin) return false; // same-origin / server-to-server have no Origin
+  if (exactOrigins.includes(origin)) return true;
+  return wildcardPatterns.some((re) => re.test(origin));
+}
+
 app.use(
   cors({
-    origin: config.corsOrigin,
+    origin(origin, cb) {
+      // Allow same-origin and server-to-server calls (no Origin header).
+      if (!origin) return cb(null, true);
+      if (isOriginAllowed(origin)) return cb(null, true);
+      return cb(new Error(`Not allowed by CORS: ${origin}`));
+    },
     credentials: true,
   })
 );
