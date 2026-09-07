@@ -308,6 +308,13 @@ const handleChatStream = async (req, res, next) => {
     const abortController = new AbortController();
     req.on('close', () => abortController.abort());
 
+    // Hard timeout on the stream connection — prevents the frontend from being stuck
+    // in "thinking" forever if the AI service is slow (cold start, model loading, etc).
+    const AI_STREAM_TIMEOUT_MS = 90_000;
+    const streamTimeout = setTimeout(() => {
+      abortController.abort();
+    }, AI_STREAM_TIMEOUT_MS);
+
     let aiResponse;
     try {
       aiResponse = await fetch(`${config.aiServiceUrl}/ai/chat/stream`, {
@@ -320,8 +327,11 @@ const handleChatStream = async (req, res, next) => {
         }),
         signal: abortController.signal,
       });
+      clearTimeout(streamTimeout);
     } catch (networkErr) {
+      clearTimeout(streamTimeout);
       if (networkErr.name === 'AbortError') {
+        res.write(`data: ${JSON.stringify({ type: 'error', content: 'AI service timed out. It may be warming up — please try again in a moment.' })}\n\n`);
         res.end();
         return;
       }

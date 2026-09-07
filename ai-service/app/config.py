@@ -23,8 +23,17 @@ class Settings(BaseSettings):
     llm_provider: str = "groq"
     llm_api_key: str = ""  # General LLM key
     groq_api_key: str = ""  # Groq-specific key
-    llm_model: str = "openai/gpt-oss-20b"
+    # llama-3.3-70b-versatile is the recommended stable Groq model.
+    # openai/gpt-oss-20b is NOT a valid Groq model and will cause 400 errors.
+    llm_model: str = "llama-3.3-70b-versatile"
     llm_timeout_seconds: float = 30.0
+
+    # ── Report LLM (Gemini for long-form report synthesis) ────────
+    report_llm_provider: str = "gemini"
+    report_llm_model: str = "gemini-2.5-flash"
+    report_gemini_model: str = "gemini-2.5-flash"
+    report_gemini_api_key: str = ""
+    report_llm_timeout_seconds: float = 60.0
 
     # ── RAG Parameters ──────────────────────────────
     rag_top_k: int = 5
@@ -97,6 +106,22 @@ class Settings(BaseSettings):
     def effective_groq_api_key(self) -> str:
         """Return the configured Groq API key from groq_api_key or llm_api_key."""
         return self.groq_api_key or self.llm_api_key or ""
+
+    @property
+    def effective_report_gemini_api_key(self) -> str:
+        """Return the Gemini API key for report generation.
+
+        Falls back through: report_gemini_api_key → gemini_api_key → empty.
+        """
+        return self.report_gemini_api_key or self.gemini_api_key or ""
+
+    @property
+    def effective_report_llm_model(self) -> str:
+        """Return the model name for report generation.
+
+        Falls back through: report_gemini_model → report_llm_model → empty.
+        """
+        return self.report_gemini_model or self.report_llm_model or ""
 
     model_config = SettingsConfigDict(
         env_file=".env",
