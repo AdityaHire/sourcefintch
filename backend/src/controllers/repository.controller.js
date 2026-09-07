@@ -237,7 +237,7 @@ const getFileContent = async (req, res, next) => {
 const updateRepositoryStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, allowed_previous } = req.body;
 
     if (!status || !VALID_STATUSES.includes(status)) {
       const err = new Error(
@@ -254,8 +254,14 @@ const updateRepositoryStatus = async (req, res, next) => {
       throw err;
     }
 
-    const updated = await Repository.update(id, { status });
-    res.json(updated);
+    // Optional `allowed_previous` makes the update conditional: it only
+    // applies when the repo is currently in one of those statuses.  This
+    // prevents the AI service from regressing a state Node already advanced
+    // (e.g. `completed` → `embedding`) when the two services race.
+    const previous = Array.isArray(allowed_previous) ? allowed_previous : [];
+    const result = await Repository.transitionStatus(id, status, previous);
+
+    res.json({ ...result, id: Number(id), status });
   } catch (error) {
     next(error);
   }

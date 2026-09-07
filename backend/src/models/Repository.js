@@ -103,6 +103,37 @@ const update = async (id, fields) => {
   return findById(id);
 };
 
+/**
+ * Compare-and-set status transition.
+ *
+ * Only updates the status if the repository is currently in one of
+ * `allowedPrevious` states.  This lets the AI service transition
+ * `storing` → `embedding` safely even when Node's safety-net already
+ * flipped the repo to `completed` — the update simply affects 0 rows
+ * instead of regressing the state.
+ *
+ * @param {number|string} id
+ * @param {string} newStatus
+ * @param {string[]} allowedPrevious - statuses that permit the transition.
+ *   Empty array = unconditional (same as `update`).
+ * @returns {object} `{ affectedRows, ...repo }` — re-reads the row afterwards.
+ */
+const transitionStatus = async (id, newStatus, allowedPrevious = []) => {
+  if (allowedPrevious.length === 0) {
+    const repo = await update(id, { status: newStatus });
+    return { affectedRows: repo ? 1 : 0, ...repo };
+  }
+
+  const placeholders = allowedPrevious.map(() => '?').join(', ');
+  const sql = `UPDATE repositories SET status = ? WHERE id = ? AND status IN (${placeholders})`;
+  const [result] = await pool.execute(
+    sql,
+    sqlParams([newStatus, id, ...allowedPrevious])
+  );
+  const repo = await findById(id);
+  return { affectedRows: result.affectedRows, ...repo };
+};
+
 // ── DELETE ──────────────────────────────────────────────────────────────────
 
 const remove = async (id) => {
@@ -111,4 +142,4 @@ const remove = async (id) => {
   return result.affectedRows > 0;
 };
 
-module.exports = { create, findById, findByUserId, findCompleted, findCompletedByUserId, findActiveByUserId, expireStuckRepositories, update, remove };
+module.exports = { create, findById, findByUserId, findCompleted, findCompletedByUserId, findActiveByUserId, expireStuckRepositories, update, transitionStatus, remove };

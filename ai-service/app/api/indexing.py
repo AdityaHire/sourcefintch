@@ -18,14 +18,32 @@ STATUS CODES
 import logging
 from dataclasses import asdict
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from app.schemas.indexing import ParseRequest
 from app.services.code_parser import parse_repository
+from app.services.vector_service import count_points
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ai", tags=["indexing"])
+
+
+@router.get("/repositories/{repository_id}/count")
+async def count_repository_chunks(repository_id: int):
+    """Return the number of Qdrant points indexed for a repository.
+
+    Used by the frontend/tests to tell whether the AI parse has finished
+    (count > 0 means chunks are queryable).
+    """
+    collection_name = settings.qdrant_collection_name
+    try:
+        count = count_points(collection_name, repository_id=repository_id)
+    except Exception as exc:
+        logger.error("Failed to count chunks for repo %d: %s", repository_id, exc)
+        raise HTTPException(status_code=502, detail=f"Failed to count chunks: {exc}")
+    return {"repository_id": repository_id, "count": count}
 
 
 @router.post("/parse")

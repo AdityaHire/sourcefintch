@@ -34,7 +34,7 @@ import stat
 import subprocess
 import tempfile
 import uuid
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 import httpx
 from fastapi import HTTPException
@@ -120,16 +120,25 @@ async def fetch_file_list(repository_id: int) -> list[dict]:
     return response.json()
 
 
-async def update_repository_status(repository_id: int, status: str) -> None:
+async def update_repository_status(repository_id: int, status: str, allowed_previous: Optional[List[str]] = None) -> None:
     """Update the repository status in Node's backend.
+
+    When `allowed_previous` is provided the PATCH is conditional: it only
+    applies when the repo is currently in one of those statuses.  This
+    prevents the AI service from regressing a state Node already advanced
+    (e.g. `completed` → `embedding`) when the two services race — the
+    update simply affects 0 rows instead of moving the state backwards.
 
     Raises:
         HTTPException(502) if Node's API is unreachable or returns non-2xx.
     """
     url = f"{settings.node_api_url}/api/repositories/{repository_id}/status"
+    body: dict[str, object] = {"status": status}
+    if allowed_previous:
+        body["allowed_previous"] = allowed_previous
 
     try:
-        response = await async_internal_patch(url, json={"status": status})
+        response = await async_internal_patch(url, json=body)
     except (httpx.ConnectError, httpx.TimeoutException) as exc:
         logger.error("Failed to reach Node API to update status for repo %d: %s", repository_id, exc)
         raise HTTPException(
@@ -360,7 +369,15 @@ async def parse_repository(
         )
 
         # ── 5. Advance status to 'embedding' ──────────────────────────
-        await update_repository_status(repository_id, "embedding")
+        # Conditional: only transitions from 'storing'.  If Node's safety
+        # net already flipped this repo to 'completed' (it marks completed
+        # right after storing files, then fires the AI parse fire-and-
+        # forget), this update is a no-op instead of regressing the state.
+        # The embedding work below still runs — the repo just stays
+        # queryable the whole time.
+        await update_repository_status(
+            repository_id, "embedding", allowed_previous=["storing"]
+        )
 
         # ── 6. Ensure Qdrant collection & Dual Idempotency Cleanup ───
         collection_name = get_active_collection_name()
@@ -370,7 +387,9 @@ async def parse_repository(
 
         # ── 7. Handle 0-chunk edge case gracefully ────────────────────
         if len(all_chunks) == 0:
-            await update_repository_status(repository_id, "completed")
+            await update_repository_status(
+                repository_id, "completed", allowed_previous=["storing", "embedding"]
+            )
             return {
                 "repository_id": repository_id,
                 "files_parsed": files_parsed,
@@ -438,14 +457,21 @@ async def parse_repository(
             except Exception as rollback_err:
                 logger.error("Compensating rollback failed: %s", rollback_err)
 
-            await update_repository_status(repository_id, "failed")
+            await update_repository_status(
+                repository_id, "failed", allowed_previous=["embedding"]
+            )
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to upsert vector embeddings into Qdrant: {qdrant_exc}",
             )
 
         # ── 11. Mark repository status as 'completed' ─────────────────
-        await update_repository_status(repository_id, "completed")
+        # Conditional: only transitions from 'embedding'.  If Node already
+        # marked the repo 'completed' (safety net), this is a no-op and the
+        # repo stays completed — which is the correct end state either way.
+        await update_repository_status(
+            repository_id, "completed", allowed_previous=["embedding"]
+        )
 
         return {
             "repository_id": repository_id,
