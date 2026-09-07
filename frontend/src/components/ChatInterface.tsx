@@ -422,6 +422,13 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
           },
           onError: (err) => {
             setErrorMessage(err);
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMsgId && !msg.content
+                  ? { ...msg, content: `⚠️ ${err}` }
+                  : msg
+              )
+            );
           },
           onSuggestions: (questions) => {
             setSuggestedQuestions(questions);

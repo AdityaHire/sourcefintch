@@ -21,7 +21,7 @@ const AI_SERVICE_URL =
   import.meta.env.VITE_AI_SERVICE_URL || 'https://sourcefintch-ai-service.onrender.com';
 
 const BACKEND_URL = (
-  import.meta.env.VITE_BACKEND_URL || 'https://sourcefintch-backend.onrender.com'
+  import.meta.env.VITE_BACKEND_URL || 'https://sourcefintch-backend-deployent.onrender.com'
 ).replace(/\/$/, '');
 
 export const apiUrl = (endpoint: string): string => {

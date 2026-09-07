@@ -240,12 +240,23 @@ async def answer_question(repository_id: int, question: str, conversation_histor
     retrieval_query = await rewrite_query(question, conversation_history)
 
     # ── Step 3: Retrieve relevant chunks from Qdrant ─────────────────
-    candidate_chunks = retrieve_relevant_chunks(
-        repository_id=repository_id,
-        query=retrieval_query,
-        top_k=settings.rag_top_k,
-        min_score=settings.rag_min_score,
-    )
+    try:
+        candidate_chunks = await asyncio.wait_for(
+            asyncio.to_thread(
+                retrieve_relevant_chunks,
+                repository_id=repository_id,
+                query=retrieval_query,
+                top_k=settings.rag_top_k,
+                min_score=settings.rag_min_score,
+            ),
+            timeout=25.0,
+        )
+    except asyncio.TimeoutError:
+        logger.warning("Retrieval timed out for repo %d; falling back to empty context", repository_id)
+        candidate_chunks = []
+    except Exception as exc:
+        logger.error("Retrieval failed for repo %d: %s", repository_id, exc)
+        candidate_chunks = []
 
     # ── Step 4: Zero-evidence short-circuit ──────────────────────────
     if not candidate_chunks:
@@ -589,12 +600,23 @@ async def stream_question(
     retrieval_query = await rewrite_query(question, conversation_history)
 
     # Step 3: Retrieve relevant chunks
-    candidate_chunks = retrieve_relevant_chunks(
-        repository_id=repository_id,
-        query=retrieval_query,
-        top_k=settings.rag_top_k,
-        min_score=settings.rag_min_score,
-    )
+    try:
+        candidate_chunks = await asyncio.wait_for(
+            asyncio.to_thread(
+                retrieve_relevant_chunks,
+                repository_id=repository_id,
+                query=retrieval_query,
+                top_k=settings.rag_top_k,
+                min_score=settings.rag_min_score,
+            ),
+            timeout=25.0,
+        )
+    except asyncio.TimeoutError:
+        logger.warning("Streaming retrieval timed out for repo %d; falling back to empty context", repository_id)
+        candidate_chunks = []
+    except Exception as exc:
+        logger.error("Streaming retrieval failed for repo %d: %s", repository_id, exc)
+        candidate_chunks = []
 
     # Step 4: Zero-evidence short-circuit
     if not candidate_chunks:

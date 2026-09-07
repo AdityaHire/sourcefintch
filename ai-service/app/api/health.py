@@ -7,6 +7,7 @@ add more routers (e.g., /embed, /query, /parse).
 """
 
 from fastapi import APIRouter
+from app.config import settings
 
 router = APIRouter()
 
@@ -17,4 +18,9 @@ async def health_check():
     return {
         "status": "ok",
         "service": "sourcefinch-ai",
+        "node_api_url": settings.node_api_url,
+        "llm_provider": settings.llm_provider,
+        "llm_model": settings.llm_model,
+        "embedding_provider": settings.embedding_provider,
+        "qdrant_configured": bool(settings.qdrant_url and "qdrant.io" in settings.qdrant_url),
     }

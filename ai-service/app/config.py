@@ -61,17 +61,17 @@ class Settings(BaseSettings):
     gemini_embedding_dimension: int = 768
 
     # ── Qdrant Vector DB ────────────────────────────
-    qdrant_url: str = "http://localhost:6333"
+    qdrant_url: str = "https://1ffa6d2b-9049-483c-bfb0-20ab52326d39.australia-southeast1-0.gcp.cloud.qdrant.io"
     qdrant_collection_name: str = "sourcefinch_chunks"
     qdrant_api_key: str = ""
 
     # ── CORS ────────────────────────────────────────
-    cors_origin: str = "http://localhost:5173"
+    cors_origin: str = "https://sourcefintch.vercel.app,https://*.vercel.app,http://localhost:5173"
 
     # ── Node API ────────────────────────────────────
-    node_api_url: str = "http://localhost:3001"
+    node_api_url: str = "https://sourcefintch-backend-deployent.onrender.com"
     # Shared secret for server-to-server calls — must match backend INTERNAL_API_SECRET.
-    internal_api_secret: str = ""
+    internal_api_secret: str = "bda7cdb388aae2a90b4e5b6316876a1c8c5ae59c5bc435c0abe8ba5df89eef34"
 
     # ── Clone settings ──────────────────────────────
     clone_timeout_seconds: int = 120

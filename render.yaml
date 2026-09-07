@@ -1,7 +1,7 @@
 services:
   # ── Python AI Service (FastAPI + Embeddings + RAG) ────────────
   - type: web
-    name: sourcefinch-ai-service
+    name: sourcefintch-ai-service
     runtime: python
     plan: starter
     rootDir: ai-service
@@ -38,20 +38,20 @@ services:
       - key: REPORT_LLM_MODEL
         value: gemini-2.5-flash
       - key: QDRANT_URL
-        sync: false
+        value: https://1ffa6d2b-9049-483c-bfb0-20ab52326d39.australia-southeast1-0.gcp.cloud.qdrant.io
       - key: QDRANT_API_KEY
         sync: false
       - key: NODE_API_URL
         fromService:
           type: web
-          name: sourcefinch-backend
+          name: sourcefintch-backend
           property: hostWithScheme
       - key: INTERNAL_API_SECRET
-        sync: false
+        value: bda7cdb388aae2a90b4e5b6316876a1c8c5ae59c5bc435c0abe8ba5df89eef34
 
   # ── Node.js Express Backend (API + Auth + Ingestion) ──────────
   - type: web
-    name: sourcefinch-backend
+    name: sourcefintch-backend
     runtime: node
     plan: starter
     rootDir: backend
@@ -84,9 +84,9 @@ services:
       - key: AI_SERVICE_URL
         fromService:
           type: web
-          name: sourcefinch-ai-service
+          name: sourcefintch-ai-service
           property: hostWithScheme
       - key: INTERNAL_API_SECRET
-        sync: false
+        value: bda7cdb388aae2a90b4e5b6316876a1c8c5ae59c5bc435c0abe8ba5df89eef34
       - key: GITHUB_TOKEN
         sync: false

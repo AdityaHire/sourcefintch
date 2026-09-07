@@ -69,7 +69,7 @@ const config = {
   },
 
   // ── AI Service ────────────────────────────────────
-  aiServiceUrl: process.env.AI_SERVICE_URL || 'http://localhost:8000',
+  aiServiceUrl: process.env.AI_SERVICE_URL || 'https://sourcefintch-ai-service.onrender.com',
 
   // ── Clerk Authentication ──────────────────────────
   clerk: {
@@ -80,7 +80,7 @@ const config = {
   // ── Internal API Secret ───────────────────────────
   // Shared with the Python AI service for server-to-server calls.
   // Must match INTERNAL_API_SECRET in ai-service/.env.
-  internalApiSecret: process.env.INTERNAL_API_SECRET || '',
+  internalApiSecret: process.env.INTERNAL_API_SECRET || 'bda7cdb388aae2a90b4e5b6316876a1c8c5ae59c5bc435c0abe8ba5df89eef34',
 };
 
 module.exports = config;
