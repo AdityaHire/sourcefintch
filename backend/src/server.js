@@ -16,11 +16,11 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('[server] Unhandled Rejection:', reason);
 });
 
-const server = app.listen(config.port, () => {
+const server = app.listen(config.port, '0.0.0.0', () => {
   console.log(
-    `\n🐦 Sourcefinch backend running → http://localhost:${config.port}` +
+    `\n🐦 Sourcefinch backend running → http://0.0.0.0:${config.port}` +
     `\n   Environment: ${config.nodeEnv}` +
-    `\n   Health check: http://localhost:${config.port}/api/health\n`
+    `\n   Health check: http://0.0.0.0:${config.port}/api/health\n`
   );
 });
 
