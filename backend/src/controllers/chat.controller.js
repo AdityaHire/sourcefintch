@@ -36,7 +36,19 @@ const handleChat = async (req, res, next) => {
     const cleanedMessage = message.trim();
     const repoIdNum = Number(repository_id);
     const repo = await Repository.findById(repoIdNum);
-    if (!repo || repo.user_id !== currentUserId) {
+    if (!repo) {
+      const err = new Error('Repository not found');
+      err.statusCode = 404;
+      throw err;
+    }
+    // Use String() coercion to guard against MySQL returning numeric user_id
+    // vs Clerk's string user_id — a strict !== comparison can false-fail in production.
+    if (String(repo.user_id) !== String(currentUserId)) {
+      console.warn(
+        `[chat] user_id mismatch for repo ${repoIdNum}: ` +
+        `stored='${repo.user_id}' (${typeof repo.user_id}), ` +
+        `current='${currentUserId}' (${typeof currentUserId})`
+      );
       const err = new Error('Repository not found');
       err.statusCode = 404;
       throw err;
@@ -209,7 +221,19 @@ const handleChatStream = async (req, res, next) => {
     const cleanedMessage = message.trim();
     const repoIdNum = Number(repository_id);
     const repo = await Repository.findById(repoIdNum);
-    if (!repo || repo.user_id !== currentUserId) {
+    if (!repo) {
+      const err = new Error('Repository not found');
+      err.statusCode = 404;
+      throw err;
+    }
+    // Use String() coercion to guard against MySQL returning numeric user_id
+    // vs Clerk's string user_id — a strict !== comparison can false-fail in production.
+    if (String(repo.user_id) !== String(currentUserId)) {
+      console.warn(
+        `[chat/stream] user_id mismatch for repo ${repoIdNum}: ` +
+        `stored='${repo.user_id}' (${typeof repo.user_id}), ` +
+        `current='${currentUserId}' (${typeof currentUserId})`
+      );
       const err = new Error('Repository not found');
       err.statusCode = 404;
       throw err;

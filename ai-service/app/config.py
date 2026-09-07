@@ -9,6 +9,7 @@ Uses Pydantic's BaseSettings:
 """
 
 from typing import Optional
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -65,6 +66,32 @@ class Settings(BaseSettings):
 
     # ── Clone settings ──────────────────────────────
     clone_timeout_seconds: int = 120
+
+    @field_validator("node_api_url", mode="before")
+    @classmethod
+    def ensure_node_api_url_scheme(cls, v: str) -> str:
+        """Ensure node_api_url always has a URL scheme.
+
+        Render's `fromService.property: host` (legacy) returns a bare hostname
+        (e.g. 'sourcefinch-backend.onrender.com') without https://.  When that
+        is passed to httpx it raises ConnectError, which cascades into a false
+        HTTP 502 / 404 'Repository not found' error on the chatbot.
+
+        Using `property: hostWithScheme` in render.yaml is the primary fix, but
+        this validator acts as a second safety net.
+        """
+        if v and not v.startswith(("http://", "https://")):
+            v = f"https://{v}"
+        # Strip trailing slash for clean URL construction
+        return v.rstrip("/")
+
+    @field_validator("cors_origin", mode="before")
+    @classmethod
+    def strip_cors_trailing_slash(cls, v: str) -> str:
+        """Strip trailing slashes from CORS origins for consistent matching."""
+        if v:
+            return ",".join(o.rstrip("/") for o in v.split(","))
+        return v
 
     @property
     def effective_groq_api_key(self) -> str:

@@ -39,7 +39,7 @@ services:
         fromService:
           type: web
           name: sourcefinch-backend
-          property: host
+          property: hostWithScheme
       - key: INTERNAL_API_SECRET
         sync: false
 
@@ -79,7 +79,7 @@ services:
         fromService:
           type: web
           name: sourcefinch-ai-service
-          property: host
+          property: hostWithScheme
       - key: INTERNAL_API_SECRET
         sync: false
       - key: GITHUB_TOKEN
