@@ -1,13 +1,14 @@
 "use client";
 
 import { FolderGit2, BookOpen, ExternalLink, Heart } from "lucide-react";
+import { Link } from "react-router-dom";
 
 interface RuixenFooterProps {
   onOpenWorkspace?: () => void;
   onOpenDocs?: () => void;
 }
 
-export function RuixenGradientFooter({ onOpenWorkspace, onOpenDocs }: RuixenFooterProps) {
+export function RuixenGradientFooter({ onOpenWorkspace }: RuixenFooterProps) {
   return (
     <footer className="relative w-full overflow-hidden bg-transparent pt-16 pb-12 font-sans-ui z-20">
       {/* ── The Dia / NotebookLM Aurora Mesh Floor Gradient (Inline SVG) ── */}
@@ -96,14 +97,13 @@ export function RuixenGradientFooter({ onOpenWorkspace, onOpenDocs }: RuixenFoot
                 <ExternalLink className="w-2.5 h-2.5 opacity-60 ml-0.5" />
               </a>
 
-              <button
-                type="button"
-                onClick={onOpenDocs}
+              <Link
+                to="/documentation"
                 className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200/80 dark:border-zinc-800/80 bg-white/60 dark:bg-zinc-900/60 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-700 hover:text-zinc-900 dark:hover:text-white transition-all shadow-2xs backdrop-blur-xs cursor-pointer"
               >
                 <BookOpen className="w-3.5 h-3.5" />
                 <span>Documentation</span>
-              </button>
+              </Link>
             </div>
           </div>
 
@@ -173,13 +173,12 @@ export function RuixenGradientFooter({ onOpenWorkspace, onOpenDocs }: RuixenFoot
             </h4>
             <ul className="space-y-2 text-xs text-zinc-500 dark:text-zinc-400">
               <li>
-                <button
-                  type="button"
-                  onClick={onOpenDocs}
+                <Link
+                  to="/documentation"
                   className="hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
                 >
                   Quickstart Guide
-                </button>
+                </Link>
               </li>
               <li>
                 <a
@@ -213,13 +212,13 @@ export function RuixenGradientFooter({ onOpenWorkspace, onOpenDocs }: RuixenFoot
           </div>
 
           <div className="flex items-center gap-4 text-zinc-500">
-            <span className="hover:text-zinc-900 dark:hover:text-zinc-300 transition-colors">
+            <Link to="/privacy" className="hover:text-zinc-900 dark:hover:text-zinc-300 transition-colors">
               Privacy Policy
-            </span>
+            </Link>
             <span>·</span>
-            <span className="hover:text-zinc-900 dark:hover:text-zinc-300 transition-colors">
+            <Link to="/terms" className="hover:text-zinc-900 dark:hover:text-zinc-300 transition-colors">
               Terms of Service
-            </span>
+            </Link>
             <span>·</span>
             <span className="hover:text-zinc-900 dark:hover:text-zinc-300 transition-colors">
               Security

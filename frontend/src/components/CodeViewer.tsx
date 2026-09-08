@@ -188,9 +188,9 @@ export default function CodeViewer({
   const scorePct = Math.round((citation.score || 0) * 100);
 
   return (
-    <div className="flex h-full w-full flex-col border-l border-zinc-200/80 dark:border-zinc-800/60 bg-white/50 dark:bg-zinc-950/60 backdrop-blur-md font-sans-ui select-none">
+    <div className="flex h-full w-full flex-col border-l border-zinc-200/80 dark:border-zinc-800/60 bg-white/50 dark:bg-[#0b0c0e]/95 backdrop-blur-md font-sans-ui select-none">
       {/* ── Top Header: File Info & Primary Controls ──────────────────────── */}
-      <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/70 dark:bg-zinc-900/50 px-4 py-2.5 shrink-0">
+      <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/70 dark:bg-[#111214]/80 px-4 py-2.5 shrink-0">
         <div className="flex items-center gap-2.5 overflow-hidden min-w-0">
           <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-700 dark:text-zinc-300 shrink-0">
             <FileCode className="w-3.5 h-3.5" />
@@ -227,7 +227,7 @@ export default function CodeViewer({
           <button
             type="button"
             onClick={handleCopyCode}
-            className="flex items-center gap-1 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer shadow-2xs font-sans-ui"
+            className="flex items-center gap-1 rounded-[7px] border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50 font-sans-ui"
             title={selectedRange ? 'Copy selected lines to clipboard' : 'Copy code to clipboard'}
           >
             {copied ? (
@@ -249,7 +249,7 @@ export default function CodeViewer({
               href={githubLink}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors shadow-2xs font-sans-ui"
+              className="flex items-center gap-1 rounded-[7px] border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50 font-sans-ui"
               title="Open permalink on GitHub"
             >
               <span>GitHub</span>
@@ -262,7 +262,7 @@ export default function CodeViewer({
             <button
               type="button"
               onClick={onClose}
-              className="flex items-center gap-1 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 px-2.5 py-1 text-xs font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-all cursor-pointer shadow-xs ml-1 font-sans-ui"
+              className="flex items-center gap-1 rounded-[7px] bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 px-2.5 py-1 text-xs font-semibold hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-all cursor-pointer shadow-xs ml-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/60 font-sans-ui"
               title="Back to conversation"
             >
               <X className="w-3.5 h-3.5" />
@@ -274,23 +274,23 @@ export default function CodeViewer({
 
       {/* ── AI Quick Actions Bar ──────────────────────────────────────────── */}
       {onAskAI && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200/90 dark:border-zinc-800/90 bg-gradient-to-r from-purple-50/50 via-zinc-50/80 to-indigo-50/50 dark:from-purple-950/20 dark:via-zinc-900/60 dark:to-indigo-950/20 px-4 py-2 shrink-0">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200/90 dark:border-zinc-800/90 bg-zinc-50/80 dark:bg-[#111214]/70 px-4 py-2 shrink-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-purple-600 dark:text-purple-400 mr-1 select-none">
+            <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-200 mr-1 select-none">
               <Sparkles className="w-3.5 h-3.5" />
               <span>AI</span>
             </span>
 
             {/* Selection indicator pill */}
             {hasCustomSelection && (
-              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-100/80 dark:bg-purple-900/40 text-[11px] font-code text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60 mr-1">
+              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-white/[0.08] text-[11px] font-code text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-white/[0.12] mr-1">
                 <span>
                   L{activeStartLine}–L{activeEndLine}
                 </span>
                 <button
                   type="button"
                   onClick={() => setSelectedRange(null)}
-                  className="hover:text-purple-900 dark:hover:text-purple-100 cursor-pointer font-sans"
+                  className="hover:text-zinc-950 dark:hover:text-white cursor-pointer font-sans"
                   title="Clear line selection"
                 >
                   <X className="w-2.5 h-2.5" />
@@ -302,7 +302,7 @@ export default function CodeViewer({
             <button
               type="button"
               onClick={triggerExplain}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-white dark:bg-zinc-800/90 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 hover:border-amber-400 dark:hover:border-amber-500/60 hover:bg-amber-50/40 dark:hover:bg-amber-950/20 hover:text-amber-700 dark:hover:text-amber-300 transition-all cursor-pointer shadow-2xs"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] text-xs font-medium bg-white dark:bg-zinc-800/90 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 hover:border-zinc-500 dark:hover:border-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/[0.08] hover:text-zinc-950 dark:hover:text-white transition-all cursor-pointer shadow-2xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50"
               title="Ask AI to explain this code snippet and its architecture"
             >
               <Lightbulb className="w-3.5 h-3.5 text-amber-500 shrink-0" />
@@ -313,10 +313,10 @@ export default function CodeViewer({
             <button
               type="button"
               onClick={triggerFindUsages}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-white dark:bg-zinc-800/90 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 hover:border-blue-400 dark:hover:border-blue-500/60 hover:bg-blue-50/40 dark:hover:bg-blue-950/20 hover:text-blue-700 dark:hover:text-blue-300 transition-all cursor-pointer shadow-2xs"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-white dark:bg-zinc-800/90 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 hover:border-zinc-500 dark:hover:border-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/[0.08] hover:text-zinc-950 dark:hover:text-white transition-all cursor-pointer shadow-2xs"
               title="Search codebase for calls and imports of this file"
             >
-              <Search className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+              <Search className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300 shrink-0" />
               <span>Find Usages</span>
             </button>
 
@@ -335,10 +335,10 @@ export default function CodeViewer({
             <button
               type="button"
               onClick={triggerTests}
-              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-white dark:bg-zinc-800/90 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 hover:border-violet-400 dark:hover:border-violet-500/60 hover:bg-violet-50/40 dark:hover:bg-violet-950/20 hover:text-violet-700 dark:hover:text-violet-300 transition-all cursor-pointer shadow-2xs"
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-white dark:bg-zinc-800/90 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 hover:border-zinc-500 dark:hover:border-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/[0.08] hover:text-zinc-950 dark:hover:text-white transition-all cursor-pointer shadow-2xs"
               title="Generate unit test suite for this file or selected lines"
             >
-              <TestTube className="w-3.5 h-3.5 text-violet-500 shrink-0" />
+              <TestTube className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300 shrink-0" />
               <span>Write Tests</span>
             </button>
           </div>
@@ -358,12 +358,12 @@ export default function CodeViewer({
                     ? `Ask about lines ${activeStartLine}–${activeEndLine}...`
                     : 'Ask anything about this code...'
                 }
-                className="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white/95 dark:bg-zinc-900/95 px-2.5 py-1 text-xs text-zinc-800 dark:text-zinc-200 placeholder-zinc-400 focus:outline-none focus:border-purple-500 dark:focus:border-purple-400 shadow-2xs font-sans-ui pr-7"
+                className="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white/95 dark:bg-zinc-900/95 px-2.5 py-1 text-xs text-zinc-800 dark:text-zinc-200 placeholder-zinc-400 focus:outline-none focus:border-zinc-500 dark:focus:border-zinc-400 focus:ring-1 focus:ring-zinc-500/20 shadow-2xs font-sans-ui pr-7"
               />
               {customPrompt.trim() && (
                 <button
                   type="submit"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 rounded text-purple-600 hover:text-purple-700 dark:text-purple-400 cursor-pointer"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 rounded text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white cursor-pointer"
                   title="Submit prompt to chat"
                 >
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -398,7 +398,7 @@ export default function CodeViewer({
                   key={idx}
                   className={`table-row transition-colors ${
                     isLineSelected
-                      ? 'bg-purple-500/10 dark:bg-purple-500/15'
+                      ? 'bg-zinc-200/70 dark:bg-white/[0.08]'
                       : 'hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30'
                   }`}
                 >
@@ -408,7 +408,7 @@ export default function CodeViewer({
                     title="Click to select line, Shift+click for range"
                     className={`table-cell select-none pr-3 text-right w-12 py-0.5 pl-4 border-r leading-5 cursor-pointer transition-colors ${
                       isLineSelected
-                        ? 'border-purple-400 dark:border-purple-500 text-purple-600 dark:text-purple-400 font-bold bg-purple-500/15 dark:bg-purple-500/20'
+                        ? 'border-zinc-500 dark:border-zinc-400 text-zinc-800 dark:text-zinc-100 font-bold bg-zinc-200/70 dark:bg-white/[0.12]'
                         : 'border-zinc-100 dark:border-zinc-800/80 text-zinc-400 dark:text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-300 bg-zinc-50/20 dark:bg-transparent'
                     }`}
                   >

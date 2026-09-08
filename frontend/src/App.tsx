@@ -6,6 +6,9 @@ import LandingPage from './pages/LandingPage';
 import WorkspacePage from './pages/WorkspacePage';
 import SignInPage from './pages/SignInPage';
 import SignUpPage from './pages/SignUpPage';
+import DocumentationPage from './pages/DocumentationPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import TermsOfServicePage from './pages/TermsOfServicePage';
 import { FadeRoute } from './components/FadeRoute';
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -40,6 +43,9 @@ function RoutedApp() {
         <Route path="/" element={<FadeRoute><LandingPage /></FadeRoute>} />
         <Route path="/sign-in" element={<FadeRoute><SignInPage /></FadeRoute>} />
         <Route path="/sign-up" element={<FadeRoute><SignUpPage /></FadeRoute>} />
+        <Route path="/documentation" element={<FadeRoute><DocumentationPage /></FadeRoute>} />
+        <Route path="/privacy" element={<FadeRoute><PrivacyPolicyPage /></FadeRoute>} />
+        <Route path="/terms" element={<FadeRoute><TermsOfServicePage /></FadeRoute>} />
         <Route
           path="/workspace"
           element={

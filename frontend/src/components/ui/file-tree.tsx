@@ -125,7 +125,7 @@ export function getFileIcon(filename: string) {
     case 'less':
       return <span className="text-sky-500 font-bold text-[10px] font-code">#</span>;
     case 'html':
-      return <span className="text-orange-500 font-bold text-[10px] font-code">&lt;&gt;</span>;
+      return <span className="text-zinc-700 dark:text-zinc-200 font-bold text-[10px] font-code">&lt;&gt;</span>;
     case 'md':
     case 'mdx':
     case 'txt':
@@ -134,9 +134,9 @@ export function getFileIcon(filename: string) {
     case 'py':
       return <span className="text-emerald-500 font-bold text-[10px] font-code">PY</span>;
     case 'rs':
-      return <span className="text-orange-600 font-bold text-[10px] font-code">RS</span>;
+      return <span className="text-zinc-700 dark:text-zinc-200 font-bold text-[10px] font-code">RS</span>;
     case 'go':
-      return <span className="text-cyan-500 font-bold text-[10px] font-code">GO</span>;
+      return <span className="text-zinc-700 dark:text-zinc-200 font-bold text-[10px] font-code">GO</span>;
     case 'sql':
       return <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-400" />;
     case 'png':
@@ -176,9 +176,9 @@ function TreeItem({ node, depth = 0 }: { node: TreeNode; depth?: number }) {
             )}
           />
           {isExpanded ? (
-            <FolderOpen className="w-4 h-4 text-orange-500 shrink-0" />
+            <FolderOpen className="w-4 h-4 text-zinc-700 dark:text-zinc-200 shrink-0" />
           ) : (
-            <Folder className="w-4 h-4 text-orange-500/80 shrink-0" />
+            <Folder className="w-4 h-4 text-zinc-600 dark:text-zinc-300 shrink-0" />
           )}
           <span className="font-medium truncate text-zinc-800 dark:text-zinc-200">{node.name}</span>
         </button>
@@ -212,7 +212,7 @@ function TreeItem({ node, depth = 0 }: { node: TreeNode; depth?: number }) {
         className={cn(
           'w-full flex items-center justify-between py-1.5 pr-2 rounded-lg text-left transition-colors cursor-pointer group',
           isSelected
-            ? 'bg-orange-500/10 dark:bg-orange-500/15 text-orange-600 dark:text-orange-400 font-semibold'
+            ? 'bg-zinc-200/70 dark:bg-white/[0.08] text-zinc-800 dark:text-zinc-100 font-semibold'
             : 'hover:bg-zinc-100 dark:hover:bg-white/[0.05] text-zinc-700 dark:text-zinc-300'
         )}
       >
@@ -344,7 +344,7 @@ export function FileTree({
         <div className="p-3 border-b border-zinc-200/80 dark:border-white/[0.06] space-y-2 shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <FolderTree className="w-4 h-4 text-orange-500" />
+              <FolderTree className="w-4 h-4 text-zinc-700 dark:text-zinc-200" />
               <span className="text-[13px] font-semibold text-zinc-900 dark:text-white">
                 {repoName ? repoName : 'Repository Files'}
               </span>
@@ -358,7 +358,7 @@ export function FileTree({
                 type="button"
                 onClick={expandedIds.size > 0 ? handleCollapseAll : handleExpandAll}
                 title={expandedIds.size > 0 ? 'Collapse All' : 'Expand All'}
-                className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
+                className="p-1 rounded-[6px] text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50"
               >
                 <ChevronsUpDown className="w-3.5 h-3.5" />
               </button>
@@ -372,7 +372,7 @@ export function FileTree({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Filter files..."
-              className="w-full rounded-lg border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] px-2.5 py-1.5 pl-7 text-xs text-zinc-900 dark:text-zinc-200 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-zinc-400 dark:focus:border-white/[0.15] focus:outline-none transition-colors font-sans-ui shadow-2xs"
+              className="w-full rounded-[7px] border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] px-2.5 py-1.5 pl-7 text-xs text-zinc-900 dark:text-zinc-200 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-zinc-500/60 dark:focus:border-zinc-400/60 focus:outline-none focus:ring-1 focus:ring-zinc-500/20 transition-colors font-sans-ui shadow-2xs"
             />
             <Search className="pointer-events-none absolute left-2 top-2 h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500" />
             {searchQuery && (

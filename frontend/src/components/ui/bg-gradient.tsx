@@ -39,7 +39,7 @@ export function BgGradient({ className, intensity = 'medium' }: BgGradientProps)
       )}
       aria-hidden="true"
     >
-      {/* Primary warm orb — large, slow drift from top-left */}
+      {/* Primary neutral light — large, slow drift from top-left */}
       <div
         className="bg-gradient-orb bg-gradient-orb--primary"
         style={{
@@ -48,7 +48,7 @@ export function BgGradient({ className, intensity = 'medium' }: BgGradientProps)
           height: '60vmax',
           borderRadius: '50%',
           background:
-            'radial-gradient(circle at center, rgba(251,146,60,0.5) 0%, rgba(251,146,60,0.15) 40%, transparent 70%)',
+            'radial-gradient(circle at center, rgba(24,24,27,0.07) 0%, rgba(24,24,27,0.02) 40%, transparent 70%)',
           top: '-20%',
           left: '-15%',
           animation: 'bgOrbDrift1 18s ease-in-out infinite alternate',
@@ -56,7 +56,7 @@ export function BgGradient({ className, intensity = 'medium' }: BgGradientProps)
         }}
       />
 
-      {/* Secondary warm orb — amber/rose, drifts from center-right */}
+      {/* Secondary neutral light — drifts from center-right */}
       <div
         className="bg-gradient-orb bg-gradient-orb--secondary"
         style={{
@@ -65,7 +65,7 @@ export function BgGradient({ className, intensity = 'medium' }: BgGradientProps)
           height: '50vmax',
           borderRadius: '50%',
           background:
-            'radial-gradient(circle at center, rgba(244,63,94,0.35) 0%, rgba(251,113,133,0.12) 45%, transparent 70%)',
+            'radial-gradient(circle at center, rgba(63,63,70,0.05) 0%, rgba(63,63,70,0.015) 45%, transparent 70%)',
           top: '10%',
           right: '-20%',
           animation: 'bgOrbDrift2 22s ease-in-out infinite alternate',
@@ -73,7 +73,7 @@ export function BgGradient({ className, intensity = 'medium' }: BgGradientProps)
         }}
       />
 
-      {/* Tertiary orb — deep amber warmth, bottom center */}
+      {/* Tertiary neutral light — bottom center */}
       <div
         className="bg-gradient-orb bg-gradient-orb--tertiary"
         style={{
@@ -82,7 +82,7 @@ export function BgGradient({ className, intensity = 'medium' }: BgGradientProps)
           height: '55vmax',
           borderRadius: '50%',
           background:
-            'radial-gradient(circle at center, rgba(217,119,6,0.3) 0%, rgba(245,158,11,0.1) 50%, transparent 70%)',
+            'radial-gradient(circle at center, rgba(113,113,122,0.045) 0%, rgba(113,113,122,0.012) 50%, transparent 70%)',
           bottom: '-25%',
           left: '20%',
           animation: 'bgOrbDrift3 25s ease-in-out infinite alternate',
@@ -90,7 +90,7 @@ export function BgGradient({ className, intensity = 'medium' }: BgGradientProps)
         }}
       />
 
-      {/* Accent orb — small, vivid orange highlight */}
+      {/* Accent neutral light — small highlight */}
       <div
         className="bg-gradient-orb bg-gradient-orb--accent"
         style={{
@@ -99,7 +99,7 @@ export function BgGradient({ className, intensity = 'medium' }: BgGradientProps)
           height: '30vmax',
           borderRadius: '50%',
           background:
-            'radial-gradient(circle at center, rgba(249,115,22,0.45) 0%, rgba(249,115,22,0.08) 50%, transparent 70%)',
+            'radial-gradient(circle at center, rgba(39,39,42,0.05) 0%, rgba(39,39,42,0.012) 50%, transparent 70%)',
           top: '40%',
           left: '35%',
           animation: 'bgOrbDrift4 15s ease-in-out infinite alternate',

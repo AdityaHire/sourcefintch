@@ -120,12 +120,12 @@ export function ConversationHistoryDrawer({
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: '100%', opacity: 0.5 }}
             transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-            className="fixed top-0 right-0 bottom-0 w-full sm:w-80 md:w-96 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-2xl border-l border-zinc-200/80 dark:border-white/[0.08] z-50 flex flex-col shadow-2xl"
+            className="fixed top-0 right-0 bottom-0 w-full sm:w-80 md:w-96 bg-white/95 dark:bg-[#0d0e10]/98 backdrop-blur-xl border-l border-zinc-200/80 dark:border-white/[0.08] z-50 flex flex-col shadow-xl shadow-black/15"
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3.5 border-b border-zinc-200/80 dark:border-white/[0.08] shrink-0">
               <div className="flex items-center gap-2 min-w-0">
-                <div className="w-7 h-7 rounded-lg bg-orange-500/10 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
+                <div className="w-7 h-7 rounded-lg bg-zinc-100 dark:bg-white/[0.08] text-zinc-700 dark:text-zinc-200 flex items-center justify-center shrink-0">
                   <MessageSquare className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
@@ -144,7 +144,7 @@ export function ConversationHistoryDrawer({
                 <button
                   type="button"
                   onClick={onNewChat}
-                  className="flex items-center gap-1 text-[11px] font-medium text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-500/10 px-2 py-1 rounded-md transition-colors cursor-pointer"
+                  className="flex items-center gap-1 text-[11px] font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/[0.08] px-2 py-1 rounded-[6px] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50"
                   title="Start a new chat thread"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -153,7 +153,7 @@ export function ConversationHistoryDrawer({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="p-1 rounded-md text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
+                  className="p-1 rounded-[6px] text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50"
                   title="Close history"
                 >
                   <X className="w-4 h-4" />
@@ -170,7 +170,7 @@ export function ConversationHistoryDrawer({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search conversations..."
-                  className="w-full bg-zinc-100/70 dark:bg-zinc-900/70 border border-zinc-200/60 dark:border-white/[0.06] rounded-lg pl-8 pr-3 py-1.5 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-all font-sans-ui"
+                  className="w-full bg-zinc-100/70 dark:bg-zinc-900/70 border border-zinc-200/60 dark:border-white/[0.06] rounded-[7px] pl-8 pr-3 py-1.5 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-500/60 focus:ring-1 focus:ring-zinc-500/20 transition-all font-sans-ui"
                 />
                 {searchQuery && (
                   <button
@@ -188,7 +188,7 @@ export function ConversationHistoryDrawer({
             <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
               {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-12 text-zinc-400 text-xs">
-                  <div className="w-5 h-5 border-2 border-orange-500/30 border-t-orange-500 rounded-full animate-spin mb-2" />
+                  <div className="w-5 h-5 border-2 border-zinc-300 dark:border-zinc-700 border-t-zinc-700 dark:border-t-zinc-200 rounded-full animate-spin mb-2" />
                   <span>Loading conversations...</span>
                 </div>
               ) : filteredConversations.length === 0 ? (
@@ -213,9 +213,9 @@ export function ConversationHistoryDrawer({
                     <div
                       key={conv.id}
                       onClick={() => !isEditing && onSelectConversation(conv.id)}
-                      className={`group relative flex items-center justify-between rounded-xl px-3 py-2.5 transition-all cursor-pointer select-none text-left ${
+                      className={`group relative flex items-center justify-between rounded-[7px] px-3 py-2.5 transition-all cursor-pointer select-none text-left focus-within:ring-2 focus-within:ring-zinc-500/40 ${
                         isActive
-                          ? 'bg-orange-500/[0.08] dark:bg-orange-500/[0.12] border border-orange-500/30 text-zinc-900 dark:text-white font-medium'
+                          ? 'bg-zinc-100 dark:bg-white/[0.08] border border-zinc-300 dark:border-white/[0.16] text-zinc-900 dark:text-white font-medium'
                           : 'hover:bg-zinc-100/80 dark:hover:bg-white/[0.04] text-zinc-700 dark:text-zinc-300 border border-transparent'
                       }`}
                     >
@@ -224,7 +224,7 @@ export function ConversationHistoryDrawer({
                         <MessageSquare
                           className={`w-3.5 h-3.5 shrink-0 ${
                             isActive
-                              ? 'text-orange-600 dark:text-orange-400'
+                              ? 'text-zinc-800 dark:text-zinc-100'
                               : 'text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300'
                           }`}
                         />
@@ -239,7 +239,7 @@ export function ConversationHistoryDrawer({
                               value={editTitle}
                               onChange={(e) => setEditTitle(e.target.value)}
                               autoFocus
-                              className="w-full bg-white dark:bg-zinc-900 border border-orange-500/50 rounded px-1.5 py-0.5 text-xs text-zinc-900 dark:text-white focus:outline-none"
+                              className="w-full bg-white dark:bg-zinc-900 border border-zinc-500/50 rounded px-1.5 py-0.5 text-xs text-zinc-900 dark:text-white focus:outline-none"
                             />
                             <button
                               type="submit"
@@ -304,7 +304,7 @@ export function ConversationHistoryDrawer({
                               <button
                                 type="button"
                                 onClick={(e) => handleStartRename(e, conv)}
-                                className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded hover:bg-zinc-200/50 dark:hover:bg-white/[0.08] transition-colors"
+                                className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded-[6px] hover:bg-zinc-200/50 dark:hover:bg-white/[0.08] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50"
                                 title="Rename conversation"
                               >
                                 <Edit2 className="w-3 h-3" />
@@ -312,7 +312,7 @@ export function ConversationHistoryDrawer({
                               <button
                                 type="button"
                                 onClick={(e) => handleDelete(e, conv.id)}
-                                className="p-1 text-zinc-400 hover:text-red-500 dark:hover:text-red-400 rounded hover:bg-red-500/10 transition-colors"
+                                className="p-1 text-zinc-400 hover:text-red-500 dark:hover:text-red-400 rounded-[6px] hover:bg-red-500/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50"
                                 title="Delete conversation"
                               >
                                 <Trash2 className="w-3 h-3" />
@@ -324,7 +324,7 @@ export function ConversationHistoryDrawer({
 
                       {/* Arrow indicator when active and not hovering */}
                       {isActive && !isEditing && !isDeleting && (
-                        <ChevronRight className="w-3 h-3 text-orange-500 shrink-0 group-hover:hidden" />
+                        <ChevronRight className="w-3 h-3 text-zinc-700 dark:text-zinc-200 shrink-0 group-hover:hidden" />
                       )}
                     </div>
                   );

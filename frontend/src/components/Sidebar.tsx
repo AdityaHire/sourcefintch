@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Link } from 'react-router-dom';
 import type { Repository } from '../types';
 import { useApiClient } from '../services/useApiClient';
 import { StatusDot } from './ui/StatusDot';
@@ -20,6 +21,8 @@ import {
   Settings,
   Sun,
   Moon,
+  FileText,
+  ShieldCheck,
 } from 'lucide-react';
 
 export type SidebarTab = 'workspace' | 'landing';
@@ -39,6 +42,34 @@ interface SidebarProps {
   onOpenDocs: () => void;
   theme?: 'light' | 'dark';
   setTheme?: (theme: 'light' | 'dark') => void;
+}
+
+function SidebarRouteLink({
+  href,
+  label,
+  icon: Icon,
+  isExpanded,
+}: {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  isExpanded: boolean;
+}) {
+  return (
+    <Link
+      to={href}
+      title={!isExpanded ? label : undefined}
+      className={`group/sidebar-link relative flex items-center gap-2.5 rounded-[7px] text-zinc-500 transition-all duration-150 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-500 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50 ${isExpanded ? 'w-full px-3 py-2' : 'mx-auto h-10 w-10 justify-center'}`}
+    >
+      <Icon className="h-[17px] w-[17px] shrink-0" />
+      {isExpanded && <span className="truncate text-[12px]">{label}</span>}
+      {!isExpanded && (
+        <span className="pointer-events-none absolute left-full z-50 ml-3 whitespace-nowrap rounded-[6px] border border-zinc-700 bg-zinc-900 px-2.5 py-1 text-[11px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/sidebar-link:opacity-100">
+          {label}
+        </span>
+      )}
+    </Link>
+  );
 }
 
 export default function Sidebar({
@@ -101,7 +132,7 @@ export default function Sidebar({
 
   const handleMouseEnter = useCallback(() => {
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    hoverTimeoutRef.current = setTimeout(() => setIsHovered(true), 60);
+    hoverTimeoutRef.current = setTimeout(() => setIsHovered(true), 180);
   }, []);
 
   const handleMouseLeave = useCallback(() => {
@@ -112,7 +143,7 @@ export default function Sidebar({
         setIsHovered(false);
         setIsUserMenuOpen(false);
       }
-    }, 200);
+    }, 280);
   }, [isSettingsOpen]);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -214,8 +245,6 @@ export default function Sidebar({
   const lastName = user?.lastName;
   const username = user?.username;
   const primaryEmail = user?.primaryEmailAddress?.emailAddress;
-  const imageUrl = user?.imageUrl;
-
   const displayName =
     [firstName, lastName].filter(Boolean).join(' ').trim() ||
     username ||
@@ -245,11 +274,11 @@ export default function Sidebar({
       type="button"
       onClick={onClick}
       title={!isExpanded ? label : undefined}
-      className={`group/nav relative flex items-center gap-2.5 rounded-xl transition-all duration-150 cursor-pointer font-sans-ui ${
+      className={`group/nav relative flex items-center gap-2.5 rounded-[7px] transition-all duration-150 cursor-pointer font-sans-ui focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50 ${
         isExpanded ? 'w-full px-3 py-2' : 'w-10 h-10 justify-center'
       } ${
-        isActive
-          ? 'bg-zinc-200/80 dark:bg-white/[0.12] text-zinc-900 dark:text-white font-semibold'
+          isActive
+          ? 'bg-zinc-200/80 dark:bg-white/[0.09] text-zinc-900 dark:text-white font-semibold before:absolute before:left-0 before:top-1/2 before:h-4 before:w-0.5 before:-translate-y-1/2 before:rounded-full before:bg-zinc-900 dark:before:bg-white'
           : 'text-zinc-500 dark:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-white/[0.06] hover:text-zinc-900 dark:hover:text-zinc-200'
       }`}
     >
@@ -259,7 +288,7 @@ export default function Sidebar({
       )}
       {/* Tooltip (collapsed only) */}
       {!isExpanded && (
-        <span className="pointer-events-none absolute left-full ml-3 px-2.5 py-1 text-[11px] font-medium text-white bg-zinc-800 dark:bg-zinc-900 rounded-lg border border-zinc-700 dark:border-zinc-800 shadow-lg opacity-0 group-hover/nav:opacity-100 transition-opacity duration-150 whitespace-nowrap z-50">
+        <span className="pointer-events-none absolute left-full ml-3 px-2.5 py-1 text-[11px] font-medium text-white bg-zinc-900 dark:bg-zinc-800 rounded-[6px] border border-zinc-700 dark:border-zinc-700 shadow-md opacity-0 group-hover/nav:opacity-100 transition-opacity duration-150 whitespace-nowrap z-50">
           {label}
         </span>
       )}
@@ -272,7 +301,7 @@ export default function Sidebar({
       <motion.aside
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        animate={{ width: isExpanded ? 260 : 56 }}
+        animate={{ width: isExpanded ? 240 : 56 }}
         className={`relative hidden md:flex flex-col border-r border-zinc-200/70 dark:border-white/[0.06] bg-zinc-50/80 dark:bg-zinc-950/80 backdrop-blur-xl z-30 shrink-0 select-none h-full ${
           isExpanded ? 'overflow-visible' : 'overflow-hidden'
         }`}
@@ -318,6 +347,24 @@ export default function Sidebar({
             label="Docs"
             onClick={onOpenDocs}
           />
+          <SidebarRouteLink
+            href="/documentation"
+            label="Documentation"
+            icon={FileText}
+            isExpanded={isExpanded}
+          />
+          <SidebarRouteLink
+            href="/privacy"
+            label="Privacy Policy"
+            icon={ShieldCheck}
+            isExpanded={isExpanded}
+          />
+          <SidebarRouteLink
+            href="/terms"
+            label="Terms of Service"
+            icon={FileText}
+            isExpanded={isExpanded}
+          />
         </div>
 
         {/* ── Divider ────────────────────────────────────────────────── */}
@@ -344,9 +391,9 @@ export default function Sidebar({
             type="button"
             onClick={() => setIsModalOpen(true)}
             title="Add Repository"
-            className={`rounded-lg flex items-center justify-center transition-all duration-150 cursor-pointer ${
-              isExpanded
-                ? 'gap-1.5 bg-gradient-to-r from-orange-500 to-amber-600 text-white px-2.5 py-1 text-[11px] font-semibold hover:from-orange-600 hover:to-amber-700 shadow-sm shadow-orange-500/20 font-sans-ui'
+                  className={`rounded-[7px] flex items-center justify-center transition-all duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50 ${
+                isExpanded
+                ? 'gap-1.5 bg-zinc-900 text-white px-2.5 py-1 text-[11px] font-semibold hover:bg-zinc-700 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 shadow-sm font-sans-ui'
                 : 'w-10 h-10 text-zinc-500 dark:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-white/[0.06] hover:text-zinc-900 dark:hover:text-zinc-200 mx-auto'
             }`}
           >
@@ -371,7 +418,7 @@ export default function Sidebar({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search repositories..."
-                  className="w-full rounded-lg border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-white/[0.04] px-3 py-1.5 pl-8 text-xs text-zinc-900 dark:text-zinc-200 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-zinc-400 dark:focus:border-white/[0.15] focus:outline-none transition-colors duration-100 font-sans-ui shadow-sm dark:shadow-none"
+                  className="w-full rounded-[7px] border border-zinc-200 dark:border-white/[0.10] bg-white dark:bg-white/[0.04] px-3 py-1.5 pl-8 text-xs text-zinc-900 dark:text-zinc-200 placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-zinc-500 dark:focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-500/20 transition-colors duration-100 font-sans-ui shadow-sm dark:shadow-none"
                 />
                 <Search className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500" />
               </div>
@@ -402,22 +449,22 @@ export default function Sidebar({
             filteredRepos.map((repo) => {
               const isSelected = selectedRepoId === repo.id;
               return (
-                <div
+                  <div
                   key={repo.id}
                   className={`group relative rounded-lg flex items-center cursor-pointer transition-all duration-100 ${
-                    isExpanded ? 'p-2.5 gap-2.5' : 'w-10 h-10 justify-center mx-auto'
+                    isExpanded ? 'p-2 gap-2' : 'w-10 h-10 justify-center mx-auto'
                   } ${
-                    isSelected
-                      ? 'bg-zinc-200/80 dark:bg-white/[0.08] border border-zinc-300/50 dark:border-white/[0.06]'
+                      isSelected
+                      ? 'bg-zinc-100 dark:bg-white/[0.08] border border-zinc-300 dark:border-white/[0.16]'
                       : 'hover:bg-zinc-100 dark:hover:bg-white/[0.04] border border-transparent'
                   }`}
                   onClick={() => onSelectRepo(repo.id)}
                   title={!isExpanded ? repo.name : undefined}
                 >
                   <div
-                    className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                    className={`w-7 h-7 rounded-[7px] flex items-center justify-center shrink-0 ${
                       isSelected
-                        ? 'bg-gradient-to-br from-orange-500 to-amber-600 text-white'
+                        ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950'
                         : 'bg-zinc-200/80 dark:bg-white/[0.06] text-zinc-500 dark:text-zinc-400'
                     }`}
                   >
@@ -444,13 +491,9 @@ export default function Sidebar({
                       <div className="flex items-center justify-between mt-0.5 text-[10.5px] text-zinc-500 dark:text-zinc-500 font-code">
                         <span className="truncate">{repo.branch || 'main'}</span>
                         <StatusDot
-                          status={repo.status === 'completed' ? 'online' : 'muted'}
-                          label={
-                            repo.status === 'completed'
-                              ? 'Ready'
-                              : (repo.status || 'Pending')
-                          }
-                          className="text-[10.5px] !gap-1"
+                          status={repo.status === 'completed' ? 'online' : repo.status === 'failed' ? 'failed' : 'checking'}
+                          label={repo.status === 'completed' ? 'Ready' : repo.status || 'Indexing'}
+                          className="w-[58px] justify-end text-[10.5px] !gap-1"
                         />
                       </div>
                     </div>
@@ -477,14 +520,13 @@ export default function Sidebar({
         </AnimatePresence>
 
         {/* ── Footer: User & Settings ──────────────────────────────────── */}
-        <div className={`border-t border-zinc-200/70 dark:border-white/[0.06] ${isExpanded ? 'px-2 py-2.5' : 'px-1.5 py-2'}`}>
+        <div className={`border-t border-zinc-200/70 dark:border-white/[0.06] ${isExpanded ? 'px-2 py-2' : 'px-1.5 py-2'}`}>
           {isExpanded ? (
             <div className="flex items-center gap-1.5">
               <div className="flex-1 min-w-0">
                 <SidebarUserRowExpanded
                   isSignedIn={isSignedIn}
                   userLoaded={userLoaded}
-                  imageUrl={imageUrl}
                   displayName={displayName}
                   initials={initials}
                   primaryEmail={primaryEmail}
@@ -493,7 +535,7 @@ export default function Sidebar({
               <button
                 type="button"
                 onClick={() => setIsSettingsOpen((prev) => !prev)}
-                className={`settings-toggle-btn p-2 rounded-xl transition-all cursor-pointer shrink-0 ${
+                className={`settings-toggle-btn p-2 rounded-[7px] transition-all cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50 ${
                   isSettingsOpen
                     ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white ring-1 ring-zinc-300 dark:ring-zinc-700 shadow-2xs'
                     : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/[0.06]'
@@ -509,7 +551,7 @@ export default function Sidebar({
                 <UserButton
                   afterSignOutUrl="/"
                   appearance={{
-                    elements: { avatarBox: 'h-8 w-8 rounded-xl' },
+                    elements: { avatarBox: 'h-8 w-8 rounded-xl ring-1 ring-zinc-300 dark:ring-zinc-700' },
                   }}
                 />
               ) : (
@@ -585,6 +627,21 @@ export default function Sidebar({
                   <BookOpen className="w-4 h-4" />
                   Docs
                 </button>
+                {[
+                  { href: '/documentation', label: 'Documentation', icon: FileText },
+                  { href: '/privacy', label: 'Privacy Policy', icon: ShieldCheck },
+                  { href: '/terms', label: 'Terms of Service', icon: FileText },
+                ].map(({ href, label, icon: Icon }) => (
+                  <Link
+                    key={href}
+                    to={href}
+                    onClick={onCloseMobile}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-semibold text-zinc-600 transition-colors duration-100 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:bg-white/[0.04] font-sans-ui"
+                  >
+                    <Icon className="h-4 w-4" />
+                    {label}
+                  </Link>
+                ))}
               </div>
 
               {/* Mobile repos */}
@@ -593,7 +650,7 @@ export default function Sidebar({
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 font-sans-ui">Repositories</span>
                   <span className="font-code text-[11px] rounded-md bg-zinc-100 dark:bg-white/[0.06] px-1.5 py-0.5 text-zinc-600 dark:text-zinc-400 font-medium">{uniqueRepos.length}</span>
                 </div>
-                <button type="button" onClick={() => setIsModalOpen(true)} className="flex items-center gap-1 rounded-lg bg-gradient-to-r from-orange-500 to-amber-600 text-white px-2.5 py-1 text-xs font-semibold shadow-sm">
+                <button type="button" onClick={() => setIsModalOpen(true)} className="flex items-center gap-1 rounded-[7px] bg-zinc-900 text-white px-2.5 py-1 text-xs font-semibold shadow-sm hover:bg-zinc-700 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200">
                   <Plus className="w-3.5 h-3.5" /><span>Add Repo</span>
                 </button>
               </div>
@@ -612,7 +669,7 @@ export default function Sidebar({
                   return (
                     <div key={repo.id} className={`rounded-lg p-2.5 flex items-center gap-2.5 cursor-pointer transition-all duration-100 ${isSelected ? 'bg-zinc-100 dark:bg-white/[0.08]' : 'hover:bg-zinc-50 dark:hover:bg-white/[0.04]'}`}
                       onClick={() => { onSelectRepo(repo.id); onCloseMobile?.(); }}>
-                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${isSelected ? 'bg-gradient-to-br from-orange-500 to-amber-600 text-white' : 'bg-zinc-100 dark:bg-white/[0.06] text-zinc-500 dark:text-zinc-400'}`}>
+                      <div className={`w-7 h-7 rounded-[7px] flex items-center justify-center shrink-0 ${isSelected ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950' : 'bg-zinc-100 dark:bg-white/[0.06] text-zinc-500 dark:text-zinc-400'}`}>
                         <FolderGit2 className="w-3.5 h-3.5" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -642,7 +699,7 @@ export default function Sidebar({
               {/* Mobile user footer */}
               <div className="border-t border-zinc-200 dark:border-white/[0.06] px-3 py-2.5 flex items-center justify-between gap-2">
                 <div className="flex-1 min-w-0">
-                  <SidebarUserRowExpanded isSignedIn={isSignedIn} userLoaded={userLoaded} imageUrl={imageUrl} displayName={displayName} initials={initials} primaryEmail={primaryEmail} />
+                  <SidebarUserRowExpanded isSignedIn={isSignedIn} userLoaded={userLoaded} displayName={displayName} initials={initials} primaryEmail={primaryEmail} />
                 </div>
                 <button
                   type="button"
@@ -692,7 +749,7 @@ export default function Sidebar({
             <button type="button" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}
               className="rounded-[var(--radius-sm)] border border-zinc-200 dark:border-zinc-800 px-4 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors duration-100 disabled:opacity-40 font-sans-ui">Cancel</button>
             <button type="submit" disabled={isSubmitting || !githubUrl.trim()}
-              className="rounded-[var(--radius-sm)] bg-gradient-to-r from-orange-500 to-amber-600 text-white px-4 py-2 text-xs font-semibold hover:from-orange-600 hover:to-amber-700 transition-all duration-100 shadow-sm shadow-orange-500/20 disabled:opacity-40 font-sans-ui">
+              className="rounded-[var(--radius-sm)] bg-zinc-900 text-white px-4 py-2 text-xs font-semibold hover:bg-zinc-700 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 transition-all duration-100 shadow-sm disabled:opacity-40 font-sans-ui">
               {isSubmitting ? 'Submitting...' : 'Ingest Repository'}
             </button>
           </div>
@@ -725,36 +782,26 @@ export default function Sidebar({
 
 // ── Expanded user row (shared by desktop expanded & mobile) ──────────────
 function SidebarUserRowExpanded({
-  isSignedIn, userLoaded, imageUrl, displayName, initials, primaryEmail,
+  isSignedIn, userLoaded, displayName, initials, primaryEmail,
 }: {
   isSignedIn: boolean | undefined;
   userLoaded: boolean;
-  imageUrl?: string;
   displayName: string;
   initials: string;
   primaryEmail?: string | null;
 }) {
   if (isSignedIn) {
-    const triggerElement = useMemo(() => (
-      <button type="button" className="w-full flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition-colors duration-100 hover:bg-zinc-100 dark:hover:bg-white/[0.06] cursor-pointer" aria-label="Open account menu">
-        {imageUrl ? (
-          <img src={imageUrl} alt={displayName} className="h-7 w-7 rounded-full object-cover ring-1 ring-zinc-200 dark:ring-zinc-700 shrink-0" />
-        ) : (
-          <div className="h-7 w-7 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 flex items-center justify-center text-[11px] font-semibold shrink-0">{initials}</div>
-        )}
-        <div className="flex-1 min-w-0">
+    return (
+      <div className="flex items-center gap-2.5 rounded-[7px] px-2 py-1.5 hover:bg-zinc-100 dark:hover:bg-white/[0.04] transition-colors">
+        <UserButton
+          afterSignOutUrl="/"
+          appearance={{ elements: { userButtonBox: 'h-7 w-7', userButtonOuterBox: 'h-7 w-7', avatarBox: 'h-7 w-7 ring-1 ring-zinc-300 dark:ring-zinc-700' } }}
+        />
+        <div className="min-w-0 flex-1">
           <div className="text-[12px] font-semibold text-zinc-900 dark:text-white truncate font-sans-ui">{userLoaded ? (primaryEmail || displayName) : '…'}</div>
           {primaryEmail && <div className="text-[10.5px] text-zinc-500 dark:text-zinc-400 truncate font-sans-ui">{displayName}</div>}
         </div>
-      </button>
-    ), [imageUrl, displayName, initials, primaryEmail, userLoaded]);
-
-    return (
-      <UserButton
-        afterSignOutUrl="/"
-        appearance={{ elements: { userButtonBox: 'hidden', userButtonOuterBox: 'hidden' } }}
-        triggerElement={triggerElement}
-      />
+      </div>
     );
   }
 

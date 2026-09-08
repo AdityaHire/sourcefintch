@@ -55,7 +55,7 @@ export interface PromptInputBoxHandle {
 export const PromptInputBox = forwardRef<PromptInputBoxHandle, PromptInputBoxProps>(
   function PromptInputBox(
     {
-      placeholder = 'Start chatting or describe a task...',
+      placeholder = 'Ask anything about this repository...',
       disabled = false,
       status,
       onSend,
@@ -136,16 +136,16 @@ export const PromptInputBox = forwardRef<PromptInputBoxHandle, PromptInputBoxPro
           handleSend();
         }}
         className={cn(
-          'relative flex items-end gap-2',
-          'rounded-2xl',
-          'border border-zinc-200/90 dark:border-white/[0.10]',
-          'bg-white/95 dark:bg-zinc-900/90',
-          'shadow-lg shadow-zinc-200/30 dark:shadow-black/40',
-          'backdrop-blur-xl',
+          'prompt-composer relative flex items-end gap-2',
+          'rounded-[9px]',
+          'border border-zinc-200/65 dark:border-white/[0.09]',
+          'bg-white/78 dark:bg-[#111214]/78',
+          'shadow-sm shadow-zinc-200/15 dark:shadow-black/15',
+          'backdrop-blur-sm',
           'transition-[border-color,box-shadow] duration-150 ease-out',
-          'focus-within:border-zinc-400 dark:focus-within:border-zinc-600',
-          'focus-within:ring-2 focus-within:ring-indigo-500/15 dark:focus-within:ring-indigo-400/10',
-          'px-3 py-1.5',
+          'focus-within:border-zinc-500/70 dark:focus-within:border-zinc-400/70',
+          'focus-within:ring-1 focus-within:ring-zinc-500/20 dark:focus-within:ring-zinc-400/15',
+          'px-4 py-2.5',
           className
         )}
       >
@@ -154,7 +154,7 @@ export const PromptInputBox = forwardRef<PromptInputBoxHandle, PromptInputBoxPro
           type="button"
           disabled={disabled}
           title="Add context"
-          className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer shrink-0 mb-0.5 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer shrink-0 mb-0.5 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50"
         >
           <Plus className="w-4 h-4" />
         </button>
@@ -175,7 +175,7 @@ export const PromptInputBox = forwardRef<PromptInputBoxHandle, PromptInputBoxPro
             'text-zinc-900 dark:text-zinc-100',
             'placeholder:text-zinc-400 dark:placeholder:text-zinc-500',
             'font-sans-ui',
-            'focus:outline-none',
+            'border-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0',
             'disabled:opacity-40 disabled:cursor-not-allowed',
             'select-text'
           )}
@@ -187,8 +187,13 @@ export const PromptInputBox = forwardRef<PromptInputBoxHandle, PromptInputBoxPro
 
         {/* Right action group: RAG badge + Send button */}
         <div className="flex items-center gap-1.5 shrink-0 mb-0.5">
+          {value.length > 0 && (
+            <span className="hidden sm:inline text-[10px] tabular-nums text-zinc-400 dark:text-zinc-600" aria-live="polite">
+              {value.length}
+            </span>
+          )}
           <div className="hidden sm:flex items-center gap-1 rounded-md bg-zinc-100 dark:bg-white/[0.05] border border-zinc-200/60 dark:border-white/[0.06] px-2 py-0.5 text-[11px] font-medium text-zinc-500 dark:text-zinc-400 font-sans-ui select-none">
-            <Sparkles className="w-3 h-3 text-orange-500 dark:text-orange-400" />
+            <Sparkles className="w-3 h-3 text-zinc-600 dark:text-zinc-300" />
             <span>RAG</span>
           </div>
 
@@ -198,7 +203,7 @@ export const PromptInputBox = forwardRef<PromptInputBoxHandle, PromptInputBoxPro
               onClick={handleStop}
               title="Stop generating"
               aria-label="Stop generating"
-              className="h-7 w-7 rounded-lg flex items-center justify-center bg-rose-600 hover:bg-rose-700 text-white transition-colors duration-100 shadow-xs cursor-pointer"
+              className="h-7 w-7 rounded-lg flex items-center justify-center bg-rose-600 hover:bg-rose-700 text-white transition-colors duration-100 shadow-xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/60"
             >
               <Square className="h-3 w-3" fill="currentColor" />
             </button>
@@ -218,7 +223,7 @@ export const PromptInputBox = forwardRef<PromptInputBoxHandle, PromptInputBoxPro
               title={canSend ? 'Send message (Enter)' : 'Type a message to send'}
               aria-label="Send message"
               className={cn(
-                'h-7 w-7 rounded-lg flex items-center justify-center transition-all duration-100',
+                'h-7 w-7 rounded-lg flex items-center justify-center transition-all duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50',
                 canSend
                   ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-200 cursor-pointer shadow-xs active:scale-95'
                   : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed opacity-50'

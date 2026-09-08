@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 @import "./styles/fonts.css";
@@ -20,24 +20,50 @@ html.dark {
 }
 
 body {
-  @apply bg-zinc-50 text-zinc-900 antialiased;
-  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+  @apply bg-[#f7f6f4] text-zinc-900 antialiased;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   margin: 0;
   padding: 0;
   overflow-x: hidden;
 }
 
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background: radial-gradient(circle at 50% -20%, rgba(24, 24, 27, 0.035), transparent 34%);
+}
+
+:focus-visible {
+  outline: 2px solid rgb(82 82 91 / 0.7);
+  outline-offset: 2px;
+}
+
+/* The composer owns the focus treatment; prevent the textarea from adding a second rectangle. */
+.prompt-composer textarea:focus,
+.prompt-composer textarea:focus-visible {
+  outline: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
 html.dark body {
-  @apply bg-zinc-950 text-zinc-100;
+  @apply bg-[#090a0b] text-zinc-100;
+  background-image: linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px);
+  background-size: 32px 32px;
 }
 
 /* ── Selection color ───────────────────────────────── */
 ::selection {
-  @apply bg-indigo-500/20 text-indigo-900;
+  background: rgb(24 24 27 / 0.12);
+  color: #27272a;
 }
 
 html.dark ::selection {
-  @apply bg-indigo-500/30 text-white;
+  background: rgb(255 255 255 / 0.18);
+  color: #ffffff;
 }
 
 /* ── Scrollbar styling (webkit) ────────────────────── */

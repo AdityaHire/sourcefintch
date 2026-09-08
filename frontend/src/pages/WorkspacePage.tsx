@@ -22,7 +22,7 @@ import { Modal } from '../components/ui/Modal';
 export default function WorkspacePage() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('sf_theme');
-    return saved === 'dark' ? 'dark' : 'light';
+    return saved === 'light' ? 'light' : 'dark';
   });
   const [isDocsOpen, setIsDocsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'workspace' | 'landing'>('workspace');
@@ -73,7 +73,7 @@ export default function WorkspacePage() {
   return (
     <div className="h-screen w-full flex bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans-ui overflow-hidden">
       {/* Animated background gradient — adapts to light/dark */}
-      <BgGradient intensity="medium" />
+      <BgGradient intensity="subtle" />
 
       {/* Subtle radial overlay for depth */}
       <div
@@ -85,8 +85,8 @@ export default function WorkspacePage() {
       />
       {/* CSS custom property set per theme */}
       <style>{`
-        :root { --bg-overlay-end: rgba(250,250,250,0.5); }
-        .dark { --bg-overlay-end: rgba(9,9,11,0.7); }
+        :root { --bg-overlay-end: rgba(250,250,250,0.54); }
+        .dark { --bg-overlay-end: rgba(9,9,11,0.72); }
       `}</style>
 
       <main className="relative z-10 flex-1 h-full min-w-0 overflow-hidden flex">
