@@ -18,11 +18,11 @@ import {
   useState,
   type KeyboardEvent,
 } from 'react';
-import { ArrowUp, Square, Loader2, Plus, Sparkles } from 'lucide-react';
+import { ArrowUp, Square, Loader2, Plus } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
-const MAX_HEIGHT = 80; // px
-const MIN_HEIGHT = 10; // px
+const MAX_HEIGHT = 160; // px
+const MIN_HEIGHT = 24; // px
 
 export type ComposerStatus = 'idle' | 'sending' | 'streaming';
 
@@ -136,16 +136,16 @@ export const PromptInputBox = forwardRef<PromptInputBoxHandle, PromptInputBoxPro
           handleSend();
         }}
         className={cn(
-          'prompt-composer relative flex items-end gap-2',
-          'rounded-[9px]',
-          'border border-zinc-200/65 dark:border-white/[0.09]',
-          'bg-white/78 dark:bg-[#111214]/78',
-          'shadow-sm shadow-zinc-200/15 dark:shadow-black/15',
-          'backdrop-blur-sm',
+          'prompt-composer relative flex items-end gap-2.5',
+          'rounded-2xl',
+          'border border-zinc-200/80 dark:border-white/[0.1]',
+          'bg-white/90 dark:bg-[#111214]/90',
+          'shadow-md shadow-zinc-200/30 dark:shadow-black/30',
+          'backdrop-blur-md',
           'transition-[border-color,box-shadow] duration-150 ease-out',
-          'focus-within:border-zinc-500/70 dark:focus-within:border-zinc-400/70',
-          'focus-within:ring-1 focus-within:ring-zinc-500/20 dark:focus-within:ring-zinc-400/15',
-          'px-4 py-2.5',
+          'focus-within:border-indigo-500/60 dark:focus-within:border-indigo-400/60',
+          'focus-within:ring-2 focus-within:ring-indigo-500/15 dark:focus-within:ring-indigo-400/15',
+          'px-3.5 py-2.5 sm:px-4 sm:py-3',
           className
         )}
       >
@@ -154,7 +154,7 @@ export const PromptInputBox = forwardRef<PromptInputBoxHandle, PromptInputBoxPro
           type="button"
           disabled={disabled}
           title="Add context"
-          className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer shrink-0 mb-0.5 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50"
+          className="w-8 h-8 rounded-md border border-transparent flex items-center justify-center text-zinc-400 hover:border-indigo-400/60 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer shrink-0 mb-0.5 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50"
         >
           <Plus className="w-4 h-4" />
         </button>
@@ -171,7 +171,7 @@ export const PromptInputBox = forwardRef<PromptInputBoxHandle, PromptInputBoxPro
           rows={1}
           className={cn(
             'flex-1 resize-none bg-transparent',
-            'py-1 text-[13.5px] leading-relaxed',
+            'py-1 text-[14px] leading-relaxed',
             'text-zinc-900 dark:text-zinc-100',
             'placeholder:text-zinc-400 dark:placeholder:text-zinc-500',
             'font-sans-ui',
@@ -185,36 +185,31 @@ export const PromptInputBox = forwardRef<PromptInputBoxHandle, PromptInputBoxPro
           }}
         />
 
-        {/* Right action group: RAG badge + Send button */}
-        <div className="flex items-center gap-1.5 shrink-0 mb-0.5">
+        {/* Right action group: Send button */}
+        <div className="flex items-center gap-2 shrink-0 mb-0.5">
           {value.length > 0 && (
-            <span className="hidden sm:inline text-[10px] tabular-nums text-zinc-400 dark:text-zinc-600" aria-live="polite">
+            <span className="hidden sm:inline text-[11px] tabular-nums text-zinc-400 dark:text-zinc-500 font-code" aria-live="polite">
               {value.length}
             </span>
           )}
-          <div className="hidden sm:flex items-center gap-1 rounded-md bg-zinc-100 dark:bg-white/[0.05] border border-zinc-200/60 dark:border-white/[0.06] px-2 py-0.5 text-[11px] font-medium text-zinc-500 dark:text-zinc-400 font-sans-ui select-none">
-            <Sparkles className="w-3 h-3 text-zinc-600 dark:text-zinc-300" />
-            <span>RAG</span>
-          </div>
-
           {isStreaming ? (
             <button
               type="button"
               onClick={handleStop}
               title="Stop generating"
               aria-label="Stop generating"
-              className="h-7 w-7 rounded-lg flex items-center justify-center bg-rose-600 hover:bg-rose-700 text-white transition-colors duration-100 shadow-xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/60"
+              className="h-8 w-8 rounded-md border border-transparent flex items-center justify-center bg-rose-600 hover:border-indigo-400/60 hover:bg-rose-500 text-white transition-all duration-150 shadow-sm cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/60"
             >
-              <Square className="h-3 w-3" fill="currentColor" />
+              <Square className="h-3.5 w-3.5" fill="currentColor" />
             </button>
           ) : isSending ? (
             <button
               type="button"
               disabled
               aria-label="Sending"
-              className="h-7 w-7 rounded-lg flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 cursor-not-allowed opacity-70"
+              className="h-8 w-8 rounded-md border border-transparent flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 cursor-not-allowed opacity-70"
             >
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin text-indigo-500" />
             </button>
           ) : (
             <button
@@ -223,13 +218,13 @@ export const PromptInputBox = forwardRef<PromptInputBoxHandle, PromptInputBoxPro
               title={canSend ? 'Send message (Enter)' : 'Type a message to send'}
               aria-label="Send message"
               className={cn(
-                'h-7 w-7 rounded-lg flex items-center justify-center transition-all duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50',
+                'h-8 w-8 rounded-md border border-transparent flex items-center justify-center transition-all duration-150 hover:border-indigo-400/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50',
                 canSend
-                  ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-200 cursor-pointer shadow-xs active:scale-95'
+                  ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-100 cursor-pointer shadow-xs active:scale-95'
                   : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed opacity-50'
               )}
             >
-              <ArrowUp className="h-3.5 w-3.5" strokeWidth={2.25} />
+              <ArrowUp className="h-4 w-4" strokeWidth={2.25} />
             </button>
           )}
         </div>

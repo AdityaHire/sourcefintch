@@ -5,12 +5,12 @@ export default function PrivacyPolicyPage() {
     <OfficialPageLayout
       eyebrow="Privacy Policy"
       title="Your code stays under your control."
-      description="SourceFinch helps developers understand and interact with software repositories through indexing, AI-powered conversations, search, and citations. Last updated: September 8, 2026."
+      description="This Privacy Policy explains how SourceFinch handles account information, connected repositories, conversations, and technical data. Last updated: September 9, 2026."
       icon="privacy"
       singleLineTitle
     >
       <p>SourceFinch ("SourceFinch", "we", "us", or "our") is a developer tool that helps users understand and interact with their software repositories using repository indexing, AI-powered conversations, search, and citations.</p>
-      <p>By using SourceFinch, you agree to the practices described in this Privacy Policy.</p>
+      <p>This Privacy Policy describes what information we collect, why we use it, how it may be shared, and the choices available to you when you use SourceFinch.</p>
 
       <OfficialSection title="1. Information We Collect">
         <h3 className="mb-2 font-semibold text-zinc-900 dark:text-zinc-100">1.1 Account Information</h3>
@@ -36,6 +36,9 @@ export default function PrivacyPolicyPage() {
 
         <h3 className="mb-2 mt-6 font-semibold text-zinc-900 dark:text-zinc-100">1.4 Technical Information</h3>
         <p>We may automatically collect limited technical information required to operate and secure the service, such as browser and device type, operating system, IP address, application logs, error and diagnostic information, and login and session information.</p>
+
+        <h3 className="mb-2 mt-6 font-semibold text-zinc-900 dark:text-zinc-100">1.5 Cookies and local storage</h3>
+        <p>SourceFinch and its service providers may use cookies, local storage, or similar technologies to maintain authentication sessions, remember preferences such as theme settings, support security, and understand service performance. You can control cookies through your browser settings, but disabling them may affect features that require authentication or saved preferences.</p>
       </OfficialSection>
 
       <OfficialSection title="2. How We Use Your Information">

@@ -252,10 +252,21 @@ function renderInlineTokens(
   });
 }
 
+function StreamingCursor() {
+  return (
+    <span className="inline-inline-flex items-center align-baseline ml-1 select-none pointer-events-none" aria-hidden="true">
+      <span className="relative inline-flex items-center justify-center">
+        <span className="h-3.5 w-[2.5px] rounded-full bg-indigo-600 dark:bg-indigo-400 shadow-[0_0_8px_rgba(99,102,241,0.9)] animate-stream-cursor" />
+      </span>
+    </span>
+  );
+}
+
 function renderBlockToken(
   token: Token,
   key: number | string,
-  onOpenCode?: (filePath: string, startLine?: number, endLine?: number) => void
+  onOpenCode?: (filePath: string, startLine?: number, endLine?: number) => void,
+  isLastStreamingToken?: boolean
 ): React.ReactNode {
   switch (token.type) {
     case 'heading': {
@@ -272,14 +283,16 @@ function renderBlockToken(
       return (
         <HeadingTag key={key} className={headingStyles[t.depth] || headingStyles[3]}>
           {t.tokens ? renderInlineTokens(t.tokens, onOpenCode) : t.text}
+          {isLastStreamingToken && <StreamingCursor />}
         </HeadingTag>
       );
     }
     case 'paragraph': {
       const t = token as Tokens.Paragraph;
       return (
-        <p key={key} className="my-2.5 text-[14px] sm:text-[14.5px] leading-relaxed text-zinc-800 dark:text-zinc-200 font-sans-ui">
+        <p key={key} className="my-2.5 text-[13.8px] sm:text-[14.2px] leading-relaxed text-left text-zinc-800 dark:text-zinc-200 font-sans-ui">
           {t.tokens ? renderInlineTokens(t.tokens, onOpenCode) : t.text}
+          {isLastStreamingToken && <StreamingCursor />}
         </p>
       );
     }
@@ -291,20 +304,22 @@ function renderBlockToken(
       const t = token as Tokens.List;
       if (t.ordered) {
         return (
-          <ol key={key} start={t.start || 1} className="my-2.5 space-y-1.5 pl-5 list-decimal text-zinc-800 dark:text-zinc-200 text-[14px] sm:text-[14.5px] leading-relaxed font-sans-ui">
+          <ol key={key} start={t.start || 1} className="my-2.5 space-y-1.5 pl-5 list-decimal text-left text-zinc-800 dark:text-zinc-200 text-[13.8px] sm:text-[14.2px] leading-relaxed font-sans-ui">
             {t.items.map((item, i) => (
               <li key={i} className="pl-1">
                 {item.tokens ? renderInlineTokens(item.tokens, onOpenCode) : item.text}
+                {isLastStreamingToken && i === t.items.length - 1 && <StreamingCursor />}
               </li>
             ))}
           </ol>
         );
       }
       return (
-        <ul key={key} className="my-2.5 space-y-1.5 pl-5 list-disc text-zinc-800 dark:text-zinc-200 text-[14px] sm:text-[14.5px] leading-relaxed marker:text-zinc-400 dark:marker:text-zinc-500 font-sans-ui">
+        <ul key={key} className="my-2.5 space-y-1.5 pl-5 list-disc text-left text-zinc-800 dark:text-zinc-200 text-[13.8px] sm:text-[14.2px] leading-relaxed marker:text-zinc-400 dark:marker:text-zinc-500 font-sans-ui">
           {t.items.map((item, i) => (
             <li key={i} className="pl-1">
               {item.tokens ? renderInlineTokens(item.tokens, onOpenCode) : item.text}
+              {isLastStreamingToken && i === t.items.length - 1 && <StreamingCursor />}
             </li>
           ))}
         </ul>
@@ -317,7 +332,8 @@ function renderBlockToken(
           key={key}
           className="my-3.5 border-l-4 border-indigo-500/80 dark:border-indigo-400 bg-indigo-50/40 dark:bg-indigo-950/20 py-2.5 px-4 text-zinc-800 dark:text-zinc-200 rounded-r-xl text-[13.5px] leading-relaxed font-sans-ui shadow-2xs"
         >
-          {t.tokens ? t.tokens.map((subToken, i) => renderBlockToken(subToken, i, onOpenCode)) : t.text}
+          {t.tokens ? t.tokens.map((subToken, i) => renderBlockToken(subToken, i, onOpenCode, isLastStreamingToken && i === t.tokens!.length - 1)) : t.text}
+          {isLastStreamingToken && (!t.tokens || t.tokens.length === 0) && <StreamingCursor />}
         </blockquote>
       );
     }
@@ -431,7 +447,7 @@ export default function MarkdownRenderer({
             },
           },
         }}
-        className={`markdown-body max-w-[72ch] text-[14px] sm:text-[14.5px] leading-relaxed text-zinc-800 dark:text-zinc-200 font-sans-ui ${className}`}
+        className={`markdown-body w-full max-w-[80ch] text-[13.8px] sm:text-[14.2px] leading-relaxed text-left text-zinc-800 dark:text-zinc-200 font-sans-ui ${className}`}
       >
         {tokens.map((token, idx) => (
           <motion.div
@@ -449,22 +465,20 @@ export default function MarkdownRenderer({
               },
             }}
           >
-            {renderBlockToken(token, idx, onOpenCode)}
+            {renderBlockToken(token, idx, onOpenCode, isStreaming && idx === tokens.length - 1)}
           </motion.div>
         ))}
-        {isStreaming && (
-          <span className="inline-block w-2 h-4 ml-1 align-middle bg-indigo-500 dark:bg-indigo-400 rounded-xs animate-pulse" />
-        )}
+        {isStreaming && tokens.length === 0 && <StreamingCursor />}
       </motion.div>
     );
   }
 
   return (
-    <div className={`markdown-body max-w-[72ch] text-[14px] sm:text-[14.5px] leading-relaxed text-zinc-800 dark:text-zinc-200 font-sans-ui ${className}`}>
-      {tokens.map((token, idx) => renderBlockToken(token, idx, onOpenCode))}
-      {isStreaming && (
-        <span className="inline-block w-2 h-4 ml-1 align-middle bg-indigo-500 dark:bg-indigo-400 rounded-xs animate-pulse" />
+    <div className={`markdown-body w-full max-w-[80ch] text-[13.8px] sm:text-[14.2px] leading-relaxed text-left text-zinc-800 dark:text-zinc-200 font-sans-ui ${className}`}>
+      {tokens.map((token, idx) =>
+        renderBlockToken(token, idx, onOpenCode, isStreaming && idx === tokens.length - 1)
       )}
+      {isStreaming && tokens.length === 0 && <StreamingCursor />}
     </div>
   );
 }

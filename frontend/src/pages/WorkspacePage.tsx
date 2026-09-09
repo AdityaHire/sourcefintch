@@ -11,30 +11,22 @@
  *     level so they survive Sidebar re-renders)
  */
 
-import { useEffect, useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import ChatInterface from '../components/ChatInterface';
 import CinematicLandingHero from '../components/CinematicLandingHero';
 import LandingPageContent from '../components/LandingPageContent';
-import { ShaderBackground } from '@/components/ui/waves-shader';
 import { BgGradient } from '@/components/ui/bg-gradient';
 import { Modal } from '../components/ui/Modal';
+import { useTheme } from '../contexts/ThemeContext';
+
+const ShaderBackground = lazy(() =>
+  import('@/components/ui/waves-shader').then((m) => ({ default: m.ShaderBackground }))
+);
 
 export default function WorkspacePage() {
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    const saved = localStorage.getItem('sf_theme');
-    return saved === 'light' ? 'light' : 'dark';
-  });
+  const { theme, setTheme } = useTheme();
   const [isDocsOpen, setIsDocsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'workspace' | 'landing'>('workspace');
-
-  useEffect(() => {
-    localStorage.setItem('sf_theme', theme);
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [theme]);
 
   const navigateTo = (tab: 'workspace' | 'landing') => {
     setActiveTab(tab);
@@ -52,7 +44,9 @@ export default function WorkspacePage() {
       <div className="h-screen w-full bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans-ui selection:bg-indigo-500/20 dark:selection:bg-indigo-500/30 selection:text-indigo-900 dark:selection:text-white flex flex-col overflow-hidden">
         <div className="relative h-screen w-full flex flex-col overflow-y-auto bg-white dark:bg-zinc-950">
           <div className="fixed inset-0 z-0 pointer-events-none opacity-25 dark:opacity-40 overflow-hidden">
-            <ShaderBackground className="h-full w-full" />
+            <Suspense fallback={null}>
+              <ShaderBackground className="h-full w-full" />
+            </Suspense>
           </div>
           <div className="fixed inset-0 z-0 pointer-events-none bg-radial from-transparent via-white/40 to-white/90 dark:via-zinc-950/40 dark:to-zinc-950/90" />
           <div className="relative z-30 flex-1 w-full">

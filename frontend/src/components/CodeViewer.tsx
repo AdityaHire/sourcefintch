@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { SourceCitation, Repository, RepositoryFile } from '../types';
 import {
   Copy,
@@ -35,6 +35,16 @@ export default function CodeViewer({
   const [copied, setCopied] = useState(false);
   const [selectedRange, setSelectedRange] = useState<[number, number] | null>(null);
   const [customPrompt, setCustomPrompt] = useState('');
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose?.();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const citation: SourceCitation | null =
     rawCitation ||

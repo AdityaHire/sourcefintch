@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 @import "./styles/fonts.css";
@@ -21,7 +21,7 @@ html.dark {
 
 body {
   @apply bg-[#f7f6f4] text-zinc-900 antialiased;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Manrope', system-ui, -apple-system, sans-serif;
   margin: 0;
   padding: 0;
   overflow-x: hidden;
@@ -122,6 +122,53 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 .animate-subtle-pulse {
   animation: subtlePulse 2s ease-in-out infinite;
 }
+
+@keyframes shimmerWave {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmerWave 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes streamBlink {
+  0%, 100% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+  50% {
+    opacity: 0.25;
+    transform: scaleY(0.85);
+  }
+}
+
+.animate-stream-cursor {
+  animation: streamBlink 0.9s ease-in-out infinite;
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.9;
+    filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.45));
+  }
+  50% {
+    transform: scale(0.96);
+    opacity: 0.55;
+    filter: drop-shadow(0 0 2px rgba(99, 102, 241, 0.15));
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2.4s ease-in-out infinite;
+}
+
+/* ── BgGradient orb animations ────────────────────────── */
 
 /* ── BgGradient orb animations ────────────────────────── */
 @keyframes bgOrbDrift1 {

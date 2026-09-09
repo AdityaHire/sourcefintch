@@ -24,6 +24,7 @@ import {
   FileText,
   ShieldCheck,
 } from 'lucide-react';
+import { useTheme } from '../contexts/ThemeContext';
 
 export type SidebarTab = 'workspace' | 'landing';
 
@@ -61,7 +62,7 @@ function SidebarRouteLink({
       title={!isExpanded ? label : undefined}
       className={`group/sidebar-link relative flex items-center gap-2.5 rounded-[7px] text-zinc-500 transition-all duration-150 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-500 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50 ${isExpanded ? 'w-full px-3 py-2' : 'mx-auto h-10 w-10 justify-center'}`}
     >
-      <Icon className="h-[17px] w-[17px] shrink-0" />
+      <Icon className="h-[19px] w-[19px] shrink-0" />
       {isExpanded && <span className="truncate text-[12px]">{label}</span>}
       {!isExpanded && (
         <span className="pointer-events-none absolute left-full z-50 ml-3 whitespace-nowrap rounded-[6px] border border-zinc-700 bg-zinc-900 px-2.5 py-1 text-[11px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/sidebar-link:opacity-100">
@@ -88,6 +89,9 @@ export default function Sidebar({
   setTheme,
 }: SidebarProps) {
   const api = useApiClient();
+  const themeCtx = useTheme();
+  const activeTheme = theme ?? themeCtx.theme;
+  const activeSetTheme = setTheme ?? themeCtx.setTheme;
   const { isSignedIn, user, isLoaded: userLoaded } = useUser();
 
   // ── Expand/collapse state (Replit: hover-expand + pinned) ─────────────
@@ -100,6 +104,18 @@ export default function Sidebar({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Close mobile drawer on Escape key
+  useEffect(() => {
+    if (!isOpenMobile) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onCloseMobile?.();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpenMobile, onCloseMobile]);
 
   // Safely close user menu tracking when clicking outside Clerk dropdown
   useEffect(() => {
@@ -274,15 +290,15 @@ export default function Sidebar({
       type="button"
       onClick={onClick}
       title={!isExpanded ? label : undefined}
-      className={`group/nav relative flex items-center gap-2.5 rounded-[7px] transition-all duration-150 cursor-pointer font-sans-ui focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50 ${
-        isExpanded ? 'w-full px-3 py-2' : 'w-10 h-10 justify-center'
+      className={`group/nav relative flex items-center gap-2.5 rounded-md transition-all duration-150 cursor-pointer font-sans-ui focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50 ${
+        isExpanded ? 'w-full px-3 py-2' : 'w-10 h-10 justify-center mx-auto'
       } ${
           isActive
           ? 'bg-zinc-200/80 dark:bg-white/[0.09] text-zinc-900 dark:text-white font-semibold before:absolute before:left-0 before:top-1/2 before:h-4 before:w-0.5 before:-translate-y-1/2 before:rounded-full before:bg-zinc-900 dark:before:bg-white'
           : 'text-zinc-500 dark:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-white/[0.06] hover:text-zinc-900 dark:hover:text-zinc-200'
       }`}
     >
-      <Icon className="w-[18px] h-[18px] shrink-0" />
+      <Icon className="w-5 h-5 shrink-0" />
       {isExpanded && (
         <span className="text-[13px] truncate">{label}</span>
       )}
@@ -301,7 +317,7 @@ export default function Sidebar({
       <motion.aside
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        animate={{ width: isExpanded ? 240 : 56 }}
+        animate={{ width: isExpanded ? 280 : 72 }}
         className={`relative hidden md:flex flex-col border-r border-zinc-200/70 dark:border-white/[0.06] bg-zinc-50/80 dark:bg-zinc-950/80 backdrop-blur-xl z-30 shrink-0 select-none h-full ${
           isExpanded ? 'overflow-visible' : 'overflow-hidden'
         }`}
@@ -341,11 +357,6 @@ export default function Sidebar({
             label="Workspace"
             isActive={activeTab === 'workspace'}
             onClick={() => onNavigateTo('workspace')}
-          />
-          <NavItem
-            icon={BookOpen}
-            label="Docs"
-            onClick={onOpenDocs}
           />
           <SidebarRouteLink
             href="/documentation"
@@ -397,7 +408,7 @@ export default function Sidebar({
                 : 'w-10 h-10 text-zinc-500 dark:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-white/[0.06] hover:text-zinc-900 dark:hover:text-zinc-200 mx-auto'
             }`}
           >
-            <Plus className={isExpanded ? 'w-3.5 h-3.5' : 'w-[18px] h-[18px]'} />
+            <Plus className={isExpanded ? 'w-3.5 h-3.5' : 'w-5 h-5'} />
             {isExpanded && <span>Add Repo</span>}
           </button>
         </div>
@@ -468,7 +479,7 @@ export default function Sidebar({
                         : 'bg-zinc-200/80 dark:bg-white/[0.06] text-zinc-500 dark:text-zinc-400'
                     }`}
                   >
-                    <FolderGit2 className="w-3.5 h-3.5" />
+                    <FolderGit2 className="w-4 h-4" />
                   </div>
                   {isExpanded && (
                     <div className="flex-1 min-w-0">
@@ -509,8 +520,8 @@ export default function Sidebar({
           {isSettingsOpen && (
             <div ref={settingsRef}>
               <SettingsPopover
-                theme={theme}
-                setTheme={setTheme}
+                theme={activeTheme}
+                setTheme={activeSetTheme}
                 onOpenDocs={onOpenDocs}
                 onClose={() => setIsSettingsOpen(false)}
                 className={isExpanded ? 'left-2 right-2' : 'left-14 w-72'}
@@ -535,7 +546,7 @@ export default function Sidebar({
               <button
                 type="button"
                 onClick={() => setIsSettingsOpen((prev) => !prev)}
-                className={`settings-toggle-btn p-2 rounded-[7px] transition-all cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50 ${
+                className={`settings-toggle-btn p-2 rounded-md transition-all cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50 ${
                   isSettingsOpen
                     ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white ring-1 ring-zinc-300 dark:ring-zinc-700 shadow-2xs'
                     : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/[0.06]'
@@ -586,6 +597,9 @@ export default function Sidebar({
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ duration: 0.25, ease: 'easeOut' }}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Mobile Navigation Menu"
               className="fixed inset-y-0 left-0 w-80 shadow-2xl bg-white dark:bg-zinc-950 z-40 md:hidden flex flex-col border-r border-zinc-200 dark:border-white/[0.06]"
             >
               <div className="flex items-center justify-between border-b border-zinc-200 dark:border-white/[0.06] px-4 py-3">
@@ -619,14 +633,6 @@ export default function Sidebar({
                     {label}
                   </button>
                 ))}
-                <button
-                  type="button"
-                  onClick={() => { onOpenDocs(); onCloseMobile?.(); }}
-                  className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-white/[0.04] transition-colors duration-100 font-sans-ui"
-                >
-                  <BookOpen className="w-4 h-4" />
-                  Docs
-                </button>
                 {[
                   { href: '/documentation', label: 'Documentation', icon: FileText },
                   { href: '/privacy', label: 'Privacy Policy', icon: ShieldCheck },
@@ -686,8 +692,8 @@ export default function Sidebar({
                 {isSettingsOpen && (
                   <div ref={settingsRef}>
                     <SettingsPopover
-                      theme={theme}
-                      setTheme={setTheme}
+                      theme={activeTheme}
+                      setTheme={activeSetTheme}
                       onOpenDocs={onOpenDocs}
                       onClose={() => setIsSettingsOpen(false)}
                       className="left-3 right-3"
@@ -704,7 +710,7 @@ export default function Sidebar({
                 <button
                   type="button"
                   onClick={() => setIsSettingsOpen((prev) => !prev)}
-                  className={`settings-toggle-btn p-2 rounded-xl transition-all cursor-pointer shrink-0 ${
+                  className={`settings-toggle-btn p-2 rounded-md transition-all cursor-pointer shrink-0 ${
                     isSettingsOpen
                       ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white ring-1 ring-zinc-300 dark:ring-zinc-700 shadow-2xs'
                       : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/[0.06]'
@@ -832,6 +838,9 @@ function SettingsPopover({
   onClose: () => void;
   className?: string;
 }) {
+  const themeCtx = useTheme();
+  const currentTheme = theme ?? themeCtx.theme;
+  const currentSetTheme = setTheme ?? themeCtx.setTheme;
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -863,7 +872,7 @@ function SettingsPopover({
         <div className="mb-2.5">
           <div className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">Theme Mode</div>
           <div className="text-[11px] text-zinc-400 dark:text-zinc-500">
-            {theme === 'dark' ? 'Dark mode active' : 'Light mode active'}
+            {currentTheme === 'dark' ? 'Dark mode active' : 'Light mode active'}
           </div>
         </div>
 
@@ -871,9 +880,9 @@ function SettingsPopover({
         <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-zinc-100 dark:bg-white/[0.04] border border-zinc-200/60 dark:border-white/[0.04]">
           <button
             type="button"
-            onClick={() => setTheme?.('light')}
+            onClick={() => currentSetTheme('light')}
             className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-              theme !== 'dark'
+              currentTheme !== 'dark'
                 ? 'bg-white text-zinc-900 shadow-xs dark:bg-zinc-800 dark:text-white font-semibold'
                 : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
             }`}
@@ -883,9 +892,9 @@ function SettingsPopover({
           </button>
           <button
             type="button"
-            onClick={() => setTheme?.('dark')}
+            onClick={() => currentSetTheme('dark')}
             className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-              theme === 'dark'
+              currentTheme === 'dark'
                 ? 'bg-white text-zinc-900 shadow-xs dark:bg-zinc-800 dark:text-white font-semibold'
                 : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
             }`}

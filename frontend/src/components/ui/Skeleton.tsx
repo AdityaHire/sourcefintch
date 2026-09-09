@@ -21,7 +21,9 @@ export function Skeleton({
   return (
     <div
       className={cn(
-        'animate-pulse bg-zinc-200/70 dark:bg-zinc-800/70',
+        'relative overflow-hidden bg-zinc-200/60 dark:bg-zinc-800/60',
+        'before:absolute before:inset-0 before:-translate-x-full before:animate-shimmer',
+        'before:bg-gradient-to-r before:from-transparent before:via-white/35 dark:before:via-white/[0.08] before:to-transparent',
         radius,
         className
       )}
