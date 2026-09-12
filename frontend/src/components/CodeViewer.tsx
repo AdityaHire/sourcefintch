@@ -14,6 +14,7 @@ import {
   TestTube,
   ArrowRight,
 } from 'lucide-react';
+import { haptics } from '../lib/applePhysics';
 
 interface CodeViewerProps {
   citation?: SourceCitation | null;
@@ -145,6 +146,7 @@ export default function CodeViewer({
   };
 
   const handleLineClick = (lineNum: number, e: React.MouseEvent) => {
+    haptics.trigger('selection');
     if (e.shiftKey && selectedRange) {
       const start = Math.min(selectedRange[0], lineNum);
       const end = Math.max(selectedRange[1], lineNum);
@@ -198,16 +200,16 @@ export default function CodeViewer({
   const scorePct = Math.round((citation.score || 0) * 100);
 
   return (
-    <div className="flex h-full w-full flex-col border-l border-zinc-200/80 dark:border-zinc-800/60 bg-white/50 dark:bg-[#0b0c0e]/95 backdrop-blur-md font-sans-ui select-none">
+    <div className="flex h-full w-full flex-col border-l border-zinc-200/80 dark:border-white/[0.08] bg-white/60 dark:bg-[#0b0c0e]/95 backdrop-blur-2xl backdrop-saturate-180 font-sans-ui select-none">
       {/* ── Top Header: File Info & Primary Controls ──────────────────────── */}
-      <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/70 dark:bg-[#111214]/80 px-4 py-2.5 shrink-0">
+      <div className="flex items-center justify-between border-b border-zinc-200/60 dark:border-white/[0.08] border-t border-t-white/80 dark:border-t-white/10 bg-white/75 dark:bg-[#0c0d0f]/80 px-4 py-2.5 shrink-0 shadow-2xs">
         <div className="flex items-center gap-2.5 overflow-hidden min-w-0">
-          <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-700 dark:text-zinc-300 shrink-0">
+          <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-white/[0.08] border border-zinc-200/80 dark:border-white/[0.08] flex items-center justify-center text-zinc-700 dark:text-zinc-300 shrink-0">
             <FileCode className="w-3.5 h-3.5" />
           </div>
           <div className="truncate min-w-0">
             <div
-              className="text-[13px] font-semibold text-zinc-900 dark:text-white truncate font-code"
+              className="text-[13px] font-semibold text-zinc-900 dark:text-white truncate font-code tracking-tight"
               title={citation.file_path}
             >
               {citation.file_path}
@@ -236,8 +238,11 @@ export default function CodeViewer({
           {/* Copy button */}
           <button
             type="button"
-            onClick={handleCopyCode}
-            className="flex items-center gap-1 rounded-[7px] border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50 font-sans-ui"
+            onClick={() => {
+              haptics.trigger('success');
+              handleCopyCode();
+            }}
+            className="flex items-center gap-1 rounded-lg border border-zinc-200/80 dark:border-white/[0.08] border-t-white/90 dark:border-t-white/15 bg-white dark:bg-white/[0.05] px-2.5 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-white/[0.08] transition-colors cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50 font-sans-ui"
             title={selectedRange ? 'Copy selected lines to clipboard' : 'Copy code to clipboard'}
           >
             {copied ? (
@@ -259,7 +264,8 @@ export default function CodeViewer({
               href={githubLink}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1 rounded-[7px] border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2.5 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50 font-sans-ui"
+              onClick={() => haptics.trigger('light')}
+              className="flex items-center gap-1 rounded-lg border border-zinc-200/80 dark:border-white/[0.08] border-t-white/90 dark:border-t-white/15 bg-white dark:bg-white/[0.05] px-2.5 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-white/[0.08] transition-colors active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50 font-sans-ui"
               title="Open permalink on GitHub"
             >
               <span>GitHub</span>
@@ -271,8 +277,11 @@ export default function CodeViewer({
           {onClose && (
             <button
               type="button"
-              onClick={onClose}
-              className="flex items-center gap-1 rounded-[7px] bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 px-2.5 py-1 text-xs font-semibold hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-all cursor-pointer shadow-xs ml-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/60 font-sans-ui"
+              onClick={() => {
+                haptics.trigger('light');
+                onClose();
+              }}
+              className="flex items-center gap-1 rounded-lg border border-transparent border-t-white/20 dark:border-t-white/40 bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 px-2.5 py-1 text-xs font-semibold hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-all cursor-pointer shadow-xs ml-1 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/60 font-sans-ui"
               title="Back to conversation"
             >
               <X className="w-3.5 h-3.5" />

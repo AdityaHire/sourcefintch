@@ -17,6 +17,7 @@ import {
   Search,
 } from "lucide-react";
 import { RuixenGradientFooter } from "./ui/ruixen-gradient-footer";
+import { haptics } from "../lib/applePhysics";
 
 interface LandingPageContentProps {
   onExplore: () => void;
@@ -310,16 +311,22 @@ export default function LandingPageContent({ onExplore, onOpenDocs }: LandingPag
           <div className="flex flex-wrap items-center justify-center gap-3">
             <button
               type="button"
-              onClick={onExplore}
-              className="inline-flex items-center gap-2 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 px-6 py-3 text-sm font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-all cursor-pointer shadow-md font-sans-ui"
+              onClick={() => {
+                haptics.trigger('medium');
+                onExplore();
+              }}
+              className="inline-flex items-center gap-2 rounded-xl border-t border-t-white/30 dark:border-t-white/50 bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 px-6 py-3 text-sm font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-all cursor-pointer shadow-md font-sans-ui active:scale-95"
             >
               <span>Open Workspace</span>
               <ArrowRight className="w-4 h-4" />
             </button>
             <button
               type="button"
-              onClick={onOpenDocs}
-              className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white/60 dark:bg-zinc-900/60 text-zinc-700 dark:text-zinc-300 px-5 py-3 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all cursor-pointer shadow-2xs font-sans-ui"
+              onClick={() => {
+                haptics.trigger('light');
+                onOpenDocs();
+              }}
+              className="inline-flex items-center gap-2 rounded-xl border border-zinc-200/80 dark:border-white/[0.08] border-t-white/80 dark:border-t-white/15 bg-white/70 dark:bg-zinc-900/60 text-zinc-700 dark:text-zinc-300 px-5 py-3 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all cursor-pointer shadow-2xs font-sans-ui active:scale-95"
             >
               <span>Read Documentation</span>
             </button>

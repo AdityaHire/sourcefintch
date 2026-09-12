@@ -3,6 +3,7 @@ import { ArrowRight, Copy, Check, FileCode } from 'lucide-react';
 import type { ChatMessage, SourceCitation } from '../types';
 import MarkdownRenderer from './MarkdownRenderer';
 import { ThinkingTool } from '@/components/ui/thinking-tool';
+import { appleSprings, haptics } from '../lib/applePhysics';
 
 interface ChatMessageListProps {
   messages: ChatMessage[];
@@ -44,9 +45,9 @@ export function ChatMessageList({
         return (
           <motion.div
             key={index}
-            initial={{ opacity: 0, y: 8, filter: 'blur(3px)' }}
-            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={appleSprings.default}
             className={`flex flex-col ${index > 0 && !isUser ? 'pt-2' : ''}`}
           >
             {/* Message Content */}
@@ -102,7 +103,7 @@ export function ChatMessageList({
                     )}
                   </div>
 
-                  <div className={`mx-auto w-full max-w-[80ch] xl:max-w-[85ch] rounded-2xl border border-zinc-200/85 border-l-2 border-l-indigo-500/80 dark:border-white/[0.08] dark:border-l-indigo-400 bg-white/70 dark:bg-zinc-900/40 p-5 sm:p-6 shadow-xs backdrop-blur-xs transition-all text-left ${!msg.content && isSubmitting && index === messages.length - 1 ? 'p-3 sm:p-4' : ''}`}>
+                  <div className={`mx-auto w-full max-w-[80ch] xl:max-w-[85ch] rounded-2xl border border-zinc-200/85 border-l-2 border-l-indigo-500/80 dark:border-white/[0.08] dark:border-l-indigo-400 border-t-white/90 dark:border-t-white/15 bg-white/80 dark:bg-[#111215]/60 p-5 sm:p-6 shadow-sm backdrop-blur-md transition-all text-left ${!msg.content && isSubmitting && index === messages.length - 1 ? 'p-3 sm:p-4' : ''}`}>
                     {msg.content ? (
                     <>
                       <MarkdownRenderer
@@ -116,11 +117,14 @@ export function ChatMessageList({
                       <div className="flex items-center justify-between border-t border-zinc-100 dark:border-zinc-800/80 mt-4 pt-3 text-zinc-400">
                         <button
                           type="button"
-                          onClick={() => onCopyMessage(msg.id || index, msg.content)}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer shadow-2xs border ${
+                          onClick={() => {
+                            haptics.trigger('success');
+                            onCopyMessage(msg.id || index, msg.content);
+                          }}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-100 cursor-pointer shadow-2xs border active:scale-95 ${
                             copiedMsgId === (msg.id || index)
                               ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800/70'
-                              : 'bg-white dark:bg-zinc-800/80 hover:bg-zinc-100 dark:hover:bg-zinc-700/80 text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white border-zinc-200/90 dark:border-zinc-700/80'
+                              : 'bg-white dark:bg-zinc-800/80 hover:bg-zinc-100 dark:hover:bg-zinc-700/80 text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white border-zinc-200/90 dark:border-zinc-700/80 border-t-white/80 dark:border-t-white/10'
                           }`}
                           title="Copy response to clipboard"
                         >
@@ -187,8 +191,11 @@ export function ChatMessageList({
                           <button
                             key={sIdx}
                             type="button"
-                            onClick={() => onCitationClick(source)}
-                            className={`w-full flex items-center justify-between px-3.5 py-2 text-left font-code text-xs transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zinc-500/50 ${
+                            onClick={() => {
+                              haptics.trigger('selection');
+                              onCitationClick(source);
+                            }}
+                            className={`w-full flex items-center justify-between px-3.5 py-2 text-left font-code text-xs transition-colors cursor-pointer active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zinc-500/50 ${
                               isSelected
                                 ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium'
                                 : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300'
@@ -251,11 +258,12 @@ export function ChatMessageList({
                 key={qIdx}
                 type="button"
                 onClick={() => {
+                  haptics.trigger('medium');
                   onClearSuggestions();
                   onSendMessage(q);
                 }}
                 disabled={!selectedRepoId || isSubmitting}
-                className="group flex items-center gap-3 rounded-xl border border-zinc-200/85 dark:border-white/[0.08] bg-white/70 dark:bg-white/[0.025] px-4 py-2.5 text-left text-[13px] text-zinc-700 dark:text-zinc-300 hover:border-indigo-400/60 hover:bg-zinc-50 dark:hover:bg-white/[0.06] dark:hover:text-white transition-all cursor-pointer font-sans-ui disabled:opacity-50 shadow-2xs"
+                className="group flex items-center gap-3 rounded-xl border border-zinc-200/85 dark:border-white/[0.08] bg-white/70 dark:bg-white/[0.025] px-4 py-2.5 text-left text-[13px] text-zinc-700 dark:text-zinc-300 hover:border-zinc-400/60 dark:hover:border-white/20 hover:bg-zinc-50 dark:hover:bg-white/[0.06] dark:hover:text-white transition-all cursor-pointer font-sans-ui disabled:opacity-50 shadow-2xs active:scale-[0.98]"
               >
                 <div className="w-5 h-5 rounded-md bg-zinc-100 dark:bg-white/[0.06] flex items-center justify-center shrink-0 group-hover:bg-indigo-50 dark:group-hover:bg-indigo-950/40 transition-colors">
                   <ArrowRight className="w-3 h-3 text-zinc-500 dark:text-zinc-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors" />

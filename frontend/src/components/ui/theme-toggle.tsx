@@ -1,98 +1,88 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Moon, Sun } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { useState, useEffect } from "react";
+import { Moon, Sun } from "lucide-react";
+import { motion } from "motion/react";
+import { cn } from "@/lib/utils";
+import { appleSprings, haptics } from "@/lib/applePhysics";
 
 interface ThemeToggleProps {
-  className?: string
-  isDark?: boolean
-  onToggle?: (isDark: boolean) => void
+  className?: string;
+  isDark?: boolean;
+  onToggle?: (isDark: boolean) => void;
 }
 
 export function ThemeToggle({ className, isDark: controlledIsDark, onToggle }: ThemeToggleProps) {
-  const [internalDark, setInternalDark] = useState(false)
+  const [internalDark, setInternalDark] = useState(false);
 
-  const isDark = controlledIsDark !== undefined ? controlledIsDark : internalDark
+  const isDark = controlledIsDark !== undefined ? controlledIsDark : internalDark;
 
   useEffect(() => {
     if (controlledIsDark === undefined) {
-      // Check document class if not controlled
-      const isDocDark = document.documentElement.classList.contains("dark")
-      setInternalDark(isDocDark)
+      const isDocDark = document.documentElement.classList.contains("dark");
+      setInternalDark(isDocDark);
     }
-  }, [controlledIsDark])
+  }, [controlledIsDark]);
 
   const handleToggle = () => {
-    const nextVal = !isDark
+    const nextVal = !isDark;
+    haptics.trigger('toggle');
     if (controlledIsDark === undefined) {
-      setInternalDark(nextVal)
+      setInternalDark(nextVal);
       if (nextVal) {
-        document.documentElement.classList.add("dark")
+        document.documentElement.classList.add("dark");
       } else {
-        document.documentElement.classList.remove("dark")
+        document.documentElement.classList.remove("dark");
       }
     }
     if (onToggle) {
-      onToggle(nextVal)
+      onToggle(nextVal);
     }
-  }
+  };
 
   return (
-    <div
+    <button
+      type="button"
       className={cn(
-        "flex w-16 h-8 p-1 rounded-full cursor-pointer transition-all duration-300 select-none",
+        "relative flex w-14 h-7 p-0.5 rounded-full cursor-pointer select-none items-center",
+        "transition-colors duration-200 border",
+        "active:scale-95 transition-transform",
         isDark 
-          ? "bg-zinc-950 border border-zinc-800" 
-          : "bg-white border border-zinc-200",
+          ? "bg-zinc-900 border-white/[0.12] shadow-inner" 
+          : "bg-zinc-200/90 border-zinc-300/80 shadow-inner",
         className
       )}
       onClick={handleToggle}
-      role="button"
-      tabIndex={0}
+      aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+      role="switch"
+      aria-checked={isDark}
     >
-      <div className="flex justify-between items-center w-full">
-        <div
-          className={cn(
-            "flex justify-center items-center w-6 h-6 rounded-full transition-transform duration-300",
-            isDark 
-              ? "transform translate-x-0 bg-zinc-800" 
-              : "transform translate-x-8 bg-gray-200"
-          )}
-        >
-          {isDark ? (
-            <Moon 
-              className="w-4 h-4 text-white" 
-              strokeWidth={1.5}
-            />
-          ) : (
-            <Sun 
-              className="w-4 h-4 text-gray-700" 
-              strokeWidth={1.5}
-            />
-          )}
-        </div>
-        <div
-          className={cn(
-            "flex justify-center items-center w-6 h-6 rounded-full transition-transform duration-300",
-            isDark 
-              ? "bg-transparent" 
-              : "transform -translate-x-8"
-          )}
-        >
-          {isDark ? (
-            <Sun 
-              className="w-4 h-4 text-gray-500" 
-              strokeWidth={1.5}
-            />
-          ) : (
-            <Moon 
-              className="w-4 h-4 text-black" 
-              strokeWidth={1.5}
-            />
-          )}
-        </div>
+      {/* Background Icons */}
+      <div className="absolute inset-0 px-1.5 flex items-center justify-between pointer-events-none text-zinc-400">
+        <Sun className={cn("w-3 h-3 transition-opacity", isDark ? "opacity-30" : "opacity-0")} />
+        <Moon className={cn("w-3 h-3 transition-opacity", isDark ? "opacity-0" : "opacity-30")} />
       </div>
-    </div>
-  )
+
+      {/* Spring-Driven Thumb */}
+      <motion.div
+        className={cn(
+          "relative z-10 flex justify-center items-center w-6 h-6 rounded-full shadow-md",
+          "border-t border-t-white/60",
+          isDark 
+            ? "bg-white text-zinc-950 shadow-black/40" 
+            : "bg-white text-zinc-800 shadow-zinc-400/40"
+        )}
+        animate={{
+          x: isDark ? 28 : 0,
+        }}
+        transition={appleSprings.switch}
+      >
+        {isDark ? (
+          <Moon className="w-3.5 h-3.5 text-zinc-950 fill-zinc-950" />
+        ) : (
+          <Sun className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+        )}
+      </motion.div>
+    </button>
+  );
 }

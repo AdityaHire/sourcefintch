@@ -1,27 +1,12 @@
 /**
- * Sourcefinch design tokens — the single source of truth for radii,
- * status colors, and shared animation timings.  Imported globally via
- * index.css.  Components reach for these tokens instead of inventing
- * one-off values.
+ * Sourcefinch Design Tokens — Apple Design foundations translated for web.
  *
- * ── RADIUS SCALE ──
- *   xs: 6px   — pills, tiny badges
- *   sm: 8px   — buttons, inputs
- *   md: 10px  — cards, suggestion tiles
- *   lg: 14px  — modal panels, code blocks
- *   xl: 18px  — composer, hero containers
- *
- * ── STATUS COLORS ──
- *   status-online       → emerald-500
- *   status-checking     → amber-400
- *   status-failed       → rose-500
- *   status-muted        → zinc-500/400
- *
- * ── TRANSITION DURATIONS ──
- *   100ms hover/active
- *   150ms panel/collapse
- *   200ms modal
- *   250ms route
+ * Single source of truth for:
+ * - Radii scale
+ * - Status colors
+ * - Translucent materials & depth
+ * - Apple typography (optical sizing, negative tracking for large display, positive for captions)
+ * - Zero-latency response on pointerdown
  */
 
 :root {
@@ -30,13 +15,16 @@
   --radius-md: 10px;
   --radius-lg: 14px;
   --radius-xl: 18px;
+  --radius-2xl: 22px;
 
+  --duration-instant: 60ms;
   --duration-hover: 100ms;
   --duration-panel: 150ms;
   --duration-modal: 200ms;
   --duration-route: 250ms;
 
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-apple: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-press: cubic-bezier(0.2, 0, 0, 1);
 
   /* Sidebar layout */
   --sidebar-rail: 56px;
@@ -46,36 +34,154 @@
   --accent-warm: 249 115 22;      /* orange-500 */
   --accent-warm-light: 251 146 60; /* orange-400 */
   --accent-warm-muted: 217 119 6;  /* amber-600 */
+
+  /* Apple Translucent Materials */
+  --material-ultra-thin: rgba(255, 255, 255, 0.45);
+  --material-thin: rgba(255, 255, 255, 0.65);
+  --material-regular: rgba(255, 255, 255, 0.82);
+  --material-thick: rgba(255, 255, 255, 0.94);
+  --material-specular: rgba(255, 255, 255, 0.55);
+  --material-blur: blur(20px) saturate(180%);
 }
 
-/* ── Global transition discipline ──────────────────────── */
-/* Buttons, inputs, and badges should NOT animate layout
-   properties.  Apply hover via color/background/border. */
+html.dark {
+  --material-ultra-thin: rgba(14, 15, 17, 0.45);
+  --material-thin: rgba(14, 15, 17, 0.65);
+  --material-regular: rgba(14, 15, 17, 0.82);
+  --material-thick: rgba(14, 15, 17, 0.94);
+  --material-specular: rgba(255, 255, 255, 0.1);
+}
+
+/* ── Global Response: Kill Latency on pointerdown ───────────── */
+/* Highlight/depress the instant it is pressed (Section 1) */
 @layer base {
   button,
   a,
   [role='button'] {
     transition-property: color, background-color, border-color, box-shadow, transform, opacity;
     transition-duration: var(--duration-hover);
-    transition-timing-function: var(--ease-out);
+    transition-timing-function: var(--ease-apple);
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button:active:not(:disabled),
+  [role='button']:active:not([aria-disabled='true']) {
+    transform: scale(0.975);
+    transition-duration: var(--duration-instant) !important;
+    transition-timing-function: var(--ease-press) !important;
   }
 }
 
-/* ── Soft scale on press for primary actions ───────────── */
-.press-scale:active {
-  transform: scale(0.97);
+/* ── Typography: Optical sizing, tracking, and leading (Section 15) ── */
+.apple-display {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro", system-ui, sans-serif;
+  font-optical-sizing: auto;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
 }
 
-/* ── Status pill helpers (single source of truth) ──────── */
+.apple-headline {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro", system-ui, sans-serif;
+  font-optical-sizing: auto;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.apple-subhead {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", system-ui, sans-serif;
+  font-optical-sizing: auto;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+}
+
+.apple-body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", system-ui, sans-serif;
+  font-optical-sizing: auto;
+  letter-spacing: -0.003em;
+  line-height: 1.55;
+}
+
+.apple-caption {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", system-ui, sans-serif;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+}
+
+/* ── Apple Translucent Materials (Section 12) ────────── */
+.apple-glass {
+  background: var(--material-thin);
+  backdrop-filter: var(--material-blur);
+  -webkit-backdrop-filter: var(--material-blur);
+  border-top: 1px solid var(--material-specular);
+}
+
+.apple-glass-heavy {
+  background: var(--material-regular);
+  backdrop-filter: var(--material-blur);
+  -webkit-backdrop-filter: var(--material-blur);
+  border-top: 1px solid var(--material-specular);
+}
+
+.apple-glass-card {
+  background: var(--material-ultra-thin);
+  backdrop-filter: var(--material-blur);
+  -webkit-backdrop-filter: var(--material-blur);
+  border-top: 1px solid var(--material-specular);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+html.dark .apple-glass-card {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* ── Status pill helpers ──────────────────────────────── */
 .status-dot {
   display: inline-block;
   width: 6px;
   height: 6px;
   border-radius: 9999px;
-  transition: background-color var(--duration-hover) var(--ease-out);
+  transition: background-color var(--duration-hover) var(--ease-apple);
 }
 .status-dot--online   { background: rgb(16 185 129); }
 .status-dot--checking { background: rgb(251 191 36); animation: subtlePulse 1.6s ease-in-out infinite; }
 .status-dot--failed   { background: rgb(244 63 94); }
 .status-dot--muted    { background: rgb(113 113 122); }
 html.dark .status-dot--muted { background: rgb(161 161 170); }
+
+/* ── Accessibility & Reduced Motion (Section 14) ──────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .apple-glass,
+  .apple-glass-heavy,
+  .apple-glass-card {
+    background: #ffffff !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  html.dark .apple-glass,
+  html.dark .apple-glass-heavy,
+  html.dark .apple-glass-card {
+    background: #0f1012 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .apple-glass,
+  .apple-glass-heavy,
+  .apple-glass-card {
+    border: 1.5px solid currentColor !important;
+  }
+}

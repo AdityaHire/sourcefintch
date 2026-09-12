@@ -25,6 +25,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import { appleSprings, haptics } from '../lib/applePhysics';
 
 export type SidebarTab = 'workspace' | 'landing';
 
@@ -70,6 +71,46 @@ function SidebarRouteLink({
         </span>
       )}
     </Link>
+  );
+}
+
+function NavItem({
+  icon: Icon,
+  label,
+  isActive,
+  isExpanded,
+  onClick,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  isActive?: boolean;
+  isExpanded: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        haptics.trigger('selection');
+        onClick();
+      }}
+      title={!isExpanded ? label : undefined}
+      className={`group/nav relative flex items-center gap-2.5 rounded-lg transition-all duration-100 cursor-pointer font-sans-ui focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50 active:scale-[0.97] ${
+        isExpanded ? 'w-full px-3 py-2' : 'w-10 h-10 justify-center mx-auto'
+      } ${
+        isActive
+          ? 'bg-zinc-200/80 dark:bg-white/[0.09] text-zinc-900 dark:text-white font-semibold shadow-2xs before:absolute before:left-0 before:top-1/2 before:h-4 before:w-0.5 before:-translate-y-1/2 before:rounded-full before:bg-zinc-900 dark:before:bg-white'
+          : 'text-zinc-500 dark:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-white/[0.06] hover:text-zinc-900 dark:hover:text-zinc-200'
+      }`}
+    >
+      <Icon className="w-5 h-5 shrink-0" />
+      {isExpanded && <span className="text-[13px] truncate">{label}</span>}
+      {!isExpanded && (
+        <span className="pointer-events-none absolute left-full ml-3 px-2.5 py-1 text-[11px] font-medium text-white bg-zinc-900 dark:bg-zinc-800 rounded-md border border-zinc-700 dark:border-zinc-700 shadow-md opacity-0 group-hover/nav:opacity-100 transition-opacity duration-150 whitespace-nowrap z-50">
+          {label}
+        </span>
+      )}
+    </button>
   );
 }
 
@@ -274,51 +315,15 @@ export default function Sidebar({
       .toUpperCase() ||
     (primaryEmail?.[0] ?? '?').toUpperCase();
 
-  // ── Nav Item (works both collapsed & expanded) ────────────────────────
-  const NavItem = ({
-    icon: Icon,
-    label,
-    isActive,
-    onClick,
-  }: {
-    icon: React.ComponentType<{ className?: string }>;
-    label: string;
-    isActive?: boolean;
-    onClick: () => void;
-  }) => (
-    <button
-      type="button"
-      onClick={onClick}
-      title={!isExpanded ? label : undefined}
-      className={`group/nav relative flex items-center gap-2.5 rounded-md transition-all duration-150 cursor-pointer font-sans-ui focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50 ${
-        isExpanded ? 'w-full px-3 py-2' : 'w-10 h-10 justify-center mx-auto'
-      } ${
-          isActive
-          ? 'bg-zinc-200/80 dark:bg-white/[0.09] text-zinc-900 dark:text-white font-semibold before:absolute before:left-0 before:top-1/2 before:h-4 before:w-0.5 before:-translate-y-1/2 before:rounded-full before:bg-zinc-900 dark:before:bg-white'
-          : 'text-zinc-500 dark:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-white/[0.06] hover:text-zinc-900 dark:hover:text-zinc-200'
-      }`}
-    >
-      <Icon className="w-5 h-5 shrink-0" />
-      {isExpanded && (
-        <span className="text-[13px] truncate">{label}</span>
-      )}
-      {/* Tooltip (collapsed only) */}
-      {!isExpanded && (
-        <span className="pointer-events-none absolute left-full ml-3 px-2.5 py-1 text-[11px] font-medium text-white bg-zinc-900 dark:bg-zinc-800 rounded-[6px] border border-zinc-700 dark:border-zinc-700 shadow-md opacity-0 group-hover/nav:opacity-100 transition-opacity duration-150 whitespace-nowrap z-50">
-          {label}
-        </span>
-      )}
-    </button>
-  );
-
   return (
     <>
-      {/* ── Desktop: Animated Collapsible Sidebar (Replit-style) ──────── */}
+      {/* ── Desktop: Animated Collapsible Sidebar (Apple-style Spring) ──────── */}
       <motion.aside
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         animate={{ width: isExpanded ? 280 : 72 }}
-        className={`relative hidden md:flex flex-col border-r border-zinc-200/70 dark:border-white/[0.06] bg-zinc-50/80 dark:bg-zinc-950/80 backdrop-blur-xl z-30 shrink-0 select-none h-full ${
+        transition={appleSprings.default}
+        className={`relative hidden md:flex flex-col border-r border-zinc-200/70 dark:border-white/[0.06] bg-zinc-50/80 dark:bg-[#0c0d0f]/85 backdrop-blur-2xl backdrop-saturate-180 z-30 shrink-0 select-none h-full ${
           isExpanded ? 'overflow-visible' : 'overflow-hidden'
         }`}
       >
@@ -350,12 +355,14 @@ export default function Sidebar({
             icon={Home}
             label="Overview"
             isActive={activeTab === 'landing'}
+            isExpanded={isExpanded}
             onClick={() => onNavigateTo('landing')}
           />
           <NavItem
             icon={MessageSquare}
             label="Workspace"
             isActive={activeTab === 'workspace'}
+            isExpanded={isExpanded}
             onClick={() => onNavigateTo('workspace')}
           />
           <SidebarRouteLink
@@ -469,7 +476,10 @@ export default function Sidebar({
                       ? 'bg-zinc-100 dark:bg-white/[0.08] border border-zinc-300 dark:border-white/[0.16]'
                       : 'hover:bg-zinc-100 dark:hover:bg-white/[0.04] border border-transparent'
                   }`}
-                  onClick={() => onSelectRepo(repo.id)}
+                  onClick={() => {
+                    haptics.trigger('selection');
+                    onSelectRepo(repo.id);
+                  }}
                   title={!isExpanded ? repo.name : undefined}
                 >
                   <div
@@ -596,11 +606,11 @@ export default function Sidebar({
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
-              transition={{ duration: 0.25, ease: 'easeOut' }}
+              transition={appleSprings.snappy}
               role="dialog"
               aria-modal="true"
               aria-label="Mobile Navigation Menu"
-              className="fixed inset-y-0 left-0 w-80 shadow-2xl bg-white dark:bg-zinc-950 z-40 md:hidden flex flex-col border-r border-zinc-200 dark:border-white/[0.06]"
+              className="fixed inset-y-0 left-0 w-80 shadow-2xl bg-white/95 dark:bg-[#0c0d0f]/95 backdrop-blur-2xl backdrop-saturate-180 z-40 md:hidden flex flex-col border-r border-zinc-200/80 dark:border-white/[0.08] border-t border-t-white/80 dark:border-t-white/10"
             >
               <div className="flex items-center justify-between border-b border-zinc-200 dark:border-white/[0.06] px-4 py-3">
                 <div className="flex items-center gap-2">

@@ -19,6 +19,7 @@ import { useCitationViewer } from '../hooks/useCitationViewer';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 
 import type { Repository } from '../types';
+import { appleSprings } from '../lib/applePhysics';
 
 // Lazy-load heavier overlay components for better bundle splitting
 const CodeViewer = lazy(() => import('./CodeViewer'));
@@ -336,20 +337,20 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
         {citationViewer.isCodeViewerOpen && (
           <motion.div
             key="code-viewer"
-            initial={{ opacity: 0, scale: 0.98 }}
+            initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.99 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            exit={{ opacity: 0, scale: 0.97 }}
+            transition={appleSprings.modal}
             role="dialog"
             aria-modal="true"
             aria-label="Code Inspector"
-            className="absolute inset-0 w-full h-full z-30 flex flex-col bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md"
-            style={{ transformOrigin: 'center' }}
+            className="absolute inset-0 w-full h-full z-30 flex flex-col bg-white/95 dark:bg-[#0c0d0f]/95 backdrop-blur-2xl backdrop-saturate-180 border-t border-t-white/80 dark:border-t-white/10"
+            style={{ transformOrigin: 'center center', willChange: 'transform, opacity' }}
           >
             <Suspense
               fallback={
                 <div className="flex h-full w-full items-center justify-center">
-                  <div className="h-6 w-6 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
+                  <div className="h-6 w-6 border-2 border-zinc-400/20 border-t-zinc-700 dark:border-t-zinc-200 rounded-full animate-spin" />
                 </div>
               }
             >
@@ -369,15 +370,15 @@ export default function ChatInterface(props: ChatInterfaceProps = {}) {
         {fileExplorer.isFileTreeOpen && (
           <motion.div
             key="file-tree-viewer"
-            initial={{ opacity: 0, scale: 0.98 }}
+            initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.99 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            exit={{ opacity: 0, scale: 0.97 }}
+            transition={appleSprings.modal}
             role="dialog"
             aria-modal="true"
             aria-label="Repository Files Explorer"
-            className="absolute inset-0 w-full h-full z-30 flex bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md overflow-hidden"
-            style={{ transformOrigin: 'center' }}
+            className="absolute inset-0 w-full h-full z-30 flex bg-white/95 dark:bg-[#0c0d0f]/95 backdrop-blur-2xl backdrop-saturate-180 overflow-hidden border-t border-t-white/80 dark:border-t-white/10"
+            style={{ transformOrigin: 'center center', willChange: 'transform, opacity' }}
           >
             {/* Left: Interactive File Tree panel */}
             <div className="w-72 sm:w-80 md:w-88 border-r border-zinc-200/80 dark:border-white/[0.06] flex flex-col h-full bg-zinc-50/50 dark:bg-zinc-950/50 shrink-0">
